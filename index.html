@@ -4,11 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>加班统计工具</title>
-
-  <!-- 极简 SVG Favicon - 内联 -->
   <link rel="icon" type="image/png" sizes="180x180" href="./icon.png">
-  
-  <!-- iOS 主屏幕图标（可选，提升 PWA 感） -->
   <link rel="apple-touch-icon" sizes="180x180" href="./icon.png">
 
   <style>
@@ -22,55 +18,69 @@
     }
 
     .container {
-      max-width: 560px;
+      max-width: 600px;
       margin: 0 auto;
       text-align: center;
     }
 
-    h1 {
-      font-size: 28px;
-      margin: 0 0 16px;
-      font-weight: 600;
-    }
-
+    h1 { font-size: 28px; margin: 0 0 16px; font-weight: 600; }
+    h2 { font-size: 22px; margin: 0 0 16px; color: #007AFF; }
+    
     .description {
       font-size: 16px;
       color: #6e6e73;
-      margin-bottom: 28px;
+      margin-bottom: 20px;
       padding: 0 10px;
     }
 
-    code {
-      background: #e9e9eb;
-      padding: 2px 6px;
-      border-radius: 4px;
-      font-size: 15px;
-    }
+    code { background: #e9e9eb; padding: 2px 6px; border-radius: 4px; font-size: 15px; }
 
+    /* 通用按钮样式 */
     .btn {
       display: block;
-      width: calc(100% - 32px);
+      width: 100%;
       max-width: 320px;
-      height: 54px;
+      height: 50px;
       margin: 0 auto 12px;
-      padding: 0;
-      font-size: 18px;
+      font-size: 17px;
       font-weight: 500;
-      line-height: 54px;
+      line-height: 50px;
       border: none;
-      border-radius: 14px;
+      border-radius: 12px;
       background: #007AFF;
       color: white;
       cursor: pointer;
       -webkit-appearance: none;
-      appearance: none;
-      text-align: center;
-      -webkit-tap-highlight-color: transparent;
       transition: background 0.2s;
     }
+    .btn:active { background: #0062cc; }
+    
+    .btn-secondary {
+      background: #e9e9eb;
+      color: #007AFF;
+    }
+    .btn-secondary:active { background: #d1d1d6; }
 
-    .btn:active {
-      background: #0062cc;
+    .btn-danger {
+      background: #ff3b30;
+      color: white;
+      height: 32px;
+      line-height: 32px;
+      font-size: 14px;
+      width: auto;
+      padding: 0 12px;
+      margin: 0;
+      border-radius: 8px;
+    }
+
+    .btn-small {
+      height: 36px;
+      line-height: 36px;
+      font-size: 14px;
+      width: auto;
+      padding: 0 16px;
+      display: inline-block;
+      margin: 0;
     }
 
     .file-name {
@@ -81,7 +91,8 @@
       padding: 0 16px;
     }
 
-    .result {
+    /* 结果和表格容器 */
+    .card {
       background: white;
       padding: 22px;
       border-radius: 18px;
@@ -89,82 +100,267 @@
       font-size: 16px;
       text-align: left;
       margin-top: 10px;
+      overflow-x: auto; /* 允许表格横向滚动 */
     }
 
-    .result h2 {
-      font-size: 20px;
-      margin: 0 0 16px;
-      color: #007AFF;
-    }
+    hr { border: 0; border-top: 1px solid #eee; margin: 16px 0; }
+    .total { font-weight: bold; font-size: 18px; color: #ff3b30; display: block; margin-top: 16px; }
 
-    .result p {
-      margin: 12px 0;
-    }
-
-    hr {
-      border: 0;
-      border-top: 1px solid #eee;
-      margin: 16px 0;
-    }
-
-    .total {
-      font-weight: bold;
-      font-size: 18px;
-      color: #ff3b30;
-      display: block;
-      margin-top: 16px;
-    }
-
-    #installPrompt {
+    /* 编辑器表格样式 */
+    table {
+      width: 100%;
+      border-collapse: collapse;
       font-size: 14px;
-      color: #8e8e93;
-      margin-top: 28px;
-      padding: 0 16px;
-      display: none;
+    }
+    th, td {
+      padding: 10px 8px;
+      border-bottom: 1px solid #eee;
+      text-align: left;
+    }
+    th { color: #8e8e93; font-weight: 500; }
+    
+    /* 输入框组 */
+    .input-group {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      justify-content: center;
+      align-items: center;
+      background: #f2f2f7;
+      padding: 10px;
+      border-radius: 12px;
+    }
+    input[type="date"], input[type="time"] {
+      border: 1px solid #d1d1d6;
+      border-radius: 8px;
+      padding: 6px;
+      font-size: 16px;
+      background: white;
+      -webkit-appearance: none;
     }
 
-    #fileInput {
-      display: none;
-    }
+    /* 视图切换控制 */
+    .view-section { display: none; }
+    .view-section.active { display: block; }
+
+    #fileInput { display: none; }
   </style>
 </head>
 <body>
+
   <div class="container">
-    <h1>加班时长计算器</h1>
-    <p class="description">选择你的 <code>overtime_log.json</code> 文件<br>（支持从 iCloud 或本地上传）</p>
+    
+    <div id="mainView" class="view-section active">
+      <h1>加班时长计算器</h1>
+      <p class="description">选择 <code>overtime_log.json</code> 文件</p>
 
-    <button class="btn" onclick="document.getElementById('fileInput').click()">
-      选择 JSON 文件
-    </button>
-    <div class="file-name" id="fileName">未选择文件</div>
-    <button class="btn" onclick="processFile()">计算加班</button>
+      <button class="btn" onclick="document.getElementById('fileInput').click()">选择 JSON 文件</button>
+      <div class="file-name" id="fileName">未选择文件</div>
+      
+      <div style="display: flex; gap: 10px; justify-content: center;">
+        <button class="btn" style="flex: 1;" onclick="processFile()">计算加班</button>
+        <button class="btn btn-secondary" style="flex: 1;" onclick="openEditor()">管理数据</button>
+      </div>
 
-    <input type="file" id="fileInput" accept=".json" onchange="showFileName()" />
+      <input type="file" id="fileInput" accept=".json" onchange="handleFileSelect()" />
 
-    <div id="result"></div>
-
-    <div id="installPrompt">
-      提示：点击 Safari 分享按钮 → “添加到主屏幕”，<br>以后可像 App 一样快速使用。
+      <div id="result"></div>
     </div>
+
+    <div id="editorView" class="view-section">
+      <h1>数据编辑器</h1>
+      <p class="description">修改本月记录 (修改后请下载新文件)</p>
+      
+      <div class="card">
+        <div class="input-group">
+          <input type="date" id="newDate">
+          <input type="time" id="newTime">
+          <button class="btn btn-small" onclick="addEntry()">添加</button>
+        </div>
+
+        <table id="dataTable">
+          <thead>
+            <tr>
+              <th width="25%">日期</th>
+              <th>打卡时间</th>
+              <th width="15%">操作</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody">
+            </tbody>
+        </table>
+      </div>
+
+      <br>
+      <button class="btn" onclick="saveAndDownload()">保存并导出新文件</button>
+      <button class="btn btn-secondary" onclick="switchView('mainView')">返回</button>
+    </div>
+
   </div>
 
   <script>
-    function showFileName() {
+    // 全局变量存储数据
+    let globalData = {};
+    let currentFileName = "overtime_log.json";
+
+    function handleFileSelect() {
       const input = document.getElementById('fileInput');
       const el = document.getElementById('fileName');
       if (input.files.length > 0) {
-        el.textContent = '已选择：' + input.files[0].name;
+        currentFileName = input.files[0].name;
+        el.textContent = '已选择：' + currentFileName;
         el.style.color = '#007AFF';
+        // 预加载数据到内存
+        loadDataToMemory(input.files[0]);
       } else {
         el.textContent = '未选择文件';
         el.style.color = '#999';
       }
     }
 
-    if (/Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent)) {
-      document.getElementById('installPrompt').style.display = 'block';
+    async function loadDataToMemory(file) {
+      try {
+        const text = await file.text();
+        globalData = JSON.parse(text);
+        // 清空之前的结果
+        document.getElementById('result').innerHTML = ""; 
+      } catch (err) {
+        alert("JSON 解析失败，请检查文件格式");
+      }
     }
 
+    // 切换视图
+    function switchView(viewId) {
+      document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+      document.getElementById(viewId).classList.add('active');
+    }
+
+    // 打开编辑器
+    function openEditor() {
+      if (Object.keys(globalData).length === 0) {
+        alert("请先选择并加载一个 JSON 文件");
+        return;
+      }
+      
+      // 设置默认日期为今天
+      const now = new Date();
+      document.getElementById('newDate').value = now.toISOString().split('T')[0];
+      
+      renderEditorTable();
+      switchView('editorView');
+    }
+
+    // 渲染编辑器表格 (只显示当月，和计算逻辑一致)
+    function renderEditorTable() {
+      const tbody = document.getElementById('tableBody');
+      tbody.innerHTML = '';
+
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const currentMonth = now.getMonth() + 1;
+      const weekdayNames = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
+
+      // 转换为数组方便排序
+      const rows = [];
+      for (const [dateStr, value] of Object.entries(globalData)) {
+        if (!value?.entries) continue;
+        const d = new Date(dateStr);
+        // 依然只展示当月，防止列表过长
+        if (d.getFullYear() !== currentYear || d.getMonth() + 1 !== currentMonth) continue;
+        
+        const entries = Array.isArray(value.entries) ? value.entries : [value.entries];
+        // 排序时间戳
+        entries.sort((a, b) => a - b);
+        
+        // 格式化时间 HH:MM
+        const timeStrings = entries.map(ts => {
+            const dt = new Date(ts);
+            return dt.toTimeString().slice(0, 5);
+        });
+
+        rows.push({
+            dateStr: dateStr,
+            weekday: weekdayNames[d.getDay()],
+            times: timeStrings.join(", "),
+            originalDate: d
+        });
+      }
+
+      // 按日期排序
+      rows.sort((a, b) => a.originalDate - b.originalDate);
+
+      if (rows.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:#999;">本月无记录</td></tr>';
+        return;
+      }
+
+      rows.forEach(row => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><strong>${row.dateStr.slice(5)}</strong><br><span style="font-size:12px;color:#888">${row.weekday}</span></td>
+          <td>${row.times}</td>
+          <td><button class="btn btn-danger" onclick="deleteEntry('${row.dateStr}')">删除</button></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // 添加记录
+    function addEntry() {
+        const dateVal = document.getElementById('newDate').value;
+        const timeVal = document.getElementById('newTime').value;
+
+        if (!dateVal || !timeVal) {
+            alert("请选择完整的日期和时间");
+            return;
+        }
+
+        // 构建时间戳 (毫秒)
+        const newTimestamp = new Date(`${dateVal}T${timeVal}:00`).getTime();
+
+        if (!globalData[dateVal]) {
+            // 如果当天没有记录，创建新对象
+            globalData[dateVal] = { entries: [] };
+        } else if (!Array.isArray(globalData[dateVal].entries)) {
+            // 兼容旧格式，转为数组
+            globalData[dateVal].entries = [globalData[dateVal].entries];
+        }
+
+        // 添加并重新渲染
+        globalData[dateVal].entries.push(newTimestamp);
+        
+        // 简单的去重排序
+        globalData[dateVal].entries.sort((a,b) => a-b);
+        
+        renderEditorTable();
+    }
+
+    // 删除记录
+    function deleteEntry(dateStr) {
+        if(confirm(`确定要删除 ${dateStr} 的所有打卡记录吗？`)) {
+            delete globalData[dateStr];
+            renderEditorTable();
+        }
+    }
+
+    // 保存并下载
+    function saveAndDownload() {
+        const dataStr = JSON.stringify(globalData, null, 2);
+        const blob = new Blob([dataStr], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = currentFileName; // 使用原文件名
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        alert("文件已生成下载，请用新文件替换旧文件。");
+    }
+
+    // --- 原有的计算逻辑 (稍微修改以使用 globalData) ---
     function formatDuration(seconds) {
       if (seconds <= 0) return "0小时0分钟";
       const h = Math.floor(seconds / 3600);
@@ -173,78 +369,77 @@
     }
 
     async function processFile() {
-  const file = document.getElementById('fileInput').files[0];
-  if (!file) {
-    alert("请先选择一个 JSON 文件");
-    return;
-  }
-
-  try {
-    const data = JSON.parse(await file.text());
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth() + 1;
-    const weekdayNames = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
-    let totalSec = 0;
-    const details = [];
-
-    for (const [dateStr, value] of Object.entries(data)) {
-      if (!value?.entries) continue;
-      const entries = Array.isArray(value.entries) ? value.entries : [value.entries];
-      const datetimes = entries.map(ts => new Date(ts)).sort((a, b) => a - b);
-      const d = new Date(dateStr);
-      if (d.getFullYear() !== currentYear || d.getMonth() + 1 !== currentMonth) continue;
-
-      const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-      let overtimeSec = 0;
-
-      if (isWeekend && datetimes.length >= 2) {
-        overtimeSec = (datetimes[datetimes.length - 1] - datetimes[0]) / 1000;
-      } else if (!isWeekend) {
-        const workEnd = new Date(d);
-        workEnd.setHours(17, 30, 0, 0);
-        const latest = datetimes[datetimes.length - 1];
-        if (latest > workEnd) overtimeSec = (latest - workEnd) / 1000;
+      // 检查内存中是否有数据
+      if (Object.keys(globalData).length === 0) {
+        // 尝试从 input 再次读取
+        const file = document.getElementById('fileInput').files[0];
+        if (!file) {
+            alert("请先选择一个 JSON 文件");
+            return;
+        }
+        await loadDataToMemory(file);
       }
 
-      // 👇 始终记录当天情况，无论是否加班
-      details.push({
-        date: dateStr,
-        weekday: weekdayNames[d.getDay()],
-        times: datetimes.map(t => t.toTimeString().slice(0, 5)).join(", "),
-        durationSec: overtimeSec, // 保存秒数用于排序/判断
-        durationStr: formatDuration(overtimeSec)
-      });
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const currentMonth = now.getMonth() + 1;
+      const weekdayNames = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
+      let totalSec = 0;
+      const details = [];
 
-      if (overtimeSec > 0) {
-        totalSec += overtimeSec;
+      try {
+        for (const [dateStr, value] of Object.entries(globalData)) {
+          if (!value?.entries) continue;
+          const entries = Array.isArray(value.entries) ? value.entries : [value.entries];
+          const datetimes = entries.map(ts => new Date(ts)).sort((a, b) => a - b);
+          const d = new Date(dateStr);
+          if (d.getFullYear() !== currentYear || d.getMonth() + 1 !== currentMonth) continue;
+
+          const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+          let overtimeSec = 0;
+
+          if (isWeekend && datetimes.length >= 2) {
+            overtimeSec = (datetimes[datetimes.length - 1] - datetimes[0]) / 1000;
+          } else if (!isWeekend) {
+            const workEnd = new Date(d);
+            workEnd.setHours(17, 30, 0, 0);
+            const latest = datetimes[datetimes.length - 1];
+            if (latest > workEnd) overtimeSec = (latest - workEnd) / 1000;
+          }
+
+          details.push({
+            date: dateStr,
+            weekday: weekdayNames[d.getDay()],
+            times: datetimes.map(t => t.toTimeString().slice(0, 5)).join(", "),
+            durationStr: formatDuration(overtimeSec)
+          });
+
+          if (overtimeSec > 0) totalSec += overtimeSec;
+        }
+
+        details.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+        let html = `<h2>${currentYear}年${currentMonth}月 加班明细</h2>`;
+        if (details.length === 0) {
+          html += `<p>本月暂无打卡记录。</p>`;
+        } else {
+          for (const day of details) {
+            html += `
+              <p><strong>${day.date} (${day.weekday})</strong><br>
+                 打卡时间: ${day.times}<br>
+                 加班时长: ${day.durationStr}</p>
+              <hr>`;
+          }
+          html += `<span class="total">总加班时长: ${(totalSec / 3600).toFixed(2)} 小时</span>`;
+        }
+
+        document.getElementById('result').innerHTML = `<div class="card">${html}</div>`;
+
+      } catch (err) {
+        document.getElementById('result').innerHTML =
+          `<div class="card" style="color:#ff3b30;">处理出错：${err.message}</div>`;
       }
     }
-
-    // 按日期排序
-    details.sort((a, b) => new Date(a.date) - new Date(b.date));
-
-    let html = `<h2>${currentYear}年${currentMonth}月 加班明细</h2>`;
-    if (details.length === 0) {
-      html += `<p>本月暂无打卡记录。</p>`;
-    } else {
-      for (const day of details) {
-        html += `
-          <p><strong>${day.date} (${day.weekday})</strong><br>
-             打卡时间: ${day.times}<br>
-             加班时长: ${day.durationStr}</p>
-          <hr>`;
-      }
-      html += `<span class="total">总加班时长: ${(totalSec / 3600).toFixed(2)} 小时</span>`;
-    }
-
-    document.getElementById('result').innerHTML = `<div class="result">${html}</div>`;
-
-  } catch (err) {
-    document.getElementById('result').innerHTML =
-      `<div class="result" style="color:#ff3b30;">解析失败：${err.message}</div>`;
-  }
-}
-    </script>
+  </script>
 </body>
 </html>
