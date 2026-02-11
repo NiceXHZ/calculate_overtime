@@ -242,9 +242,12 @@
         return;
       }
       
-      // 设置默认日期为今天
+      // 设置默认日期和时间为现在
       const now = new Date();
+      // YYYY-MM-DD
       document.getElementById('newDate').value = now.toISOString().split('T')[0];
+      // HH:MM (截取本地时间字符串的前5位)
+      document.getElementById('newTime').value = now.toTimeString().slice(0, 5);
       
       renderEditorTable();
       switchView('editorView');
