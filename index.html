@@ -277,6 +277,23 @@
       display:block; font-size:10px; color:var(--text-tertiary); text-transform:uppercase; letter-spacing:0.06em; margin-top:4px;
     }
 
+    /* Phase 4b: File bar — full-width row for filename */
+    .file-bar {
+      display:none; align-items:center; gap:10px;
+      background:var(--glass-bg-card);
+      backdrop-filter:blur(var(--blur-button)) saturate(var(--saturate));
+      -webkit-backdrop-filter:blur(var(--blur-button)) saturate(var(--saturate));
+      border:var(--glass-border); border-radius:var(--radius-sm);
+      padding:12px 16px; margin-bottom:16px;
+      animation:pillPopIn 0.35s cubic-bezier(0.22,0.61,0.36,1) forwards;
+      opacity:0;
+    }
+    .file-bar.visible { display:flex; }
+
+    .file-bar__name {
+      font-size:13px; font-weight:500; color:var(--text-secondary); word-break:break-all; line-height:1.4;
+    }
+
     /* ============================================================
        Buttons
        ============================================================ */
@@ -308,13 +325,13 @@
     .btn-primary:active { background:#0070e0; box-shadow:0 2px 10px var(--accent-glow); transform:translateY(0) scale(0.98); }
 
     .btn-secondary {
-      background:var(--glass-bg-button);
+      background:rgba(255,255,255,0.14);
       backdrop-filter:blur(var(--blur-button)) saturate(var(--saturate));
       -webkit-backdrop-filter:blur(var(--blur-button)) saturate(var(--saturate));
-      border:var(--glass-border); color:var(--text-primary); height:50px; padding:0 28px;
+      border:1px solid rgba(255,255,255,0.18); color:rgba(255,255,255,0.90); height:50px; padding:0 28px;
     }
-    .btn-secondary:hover { background:var(--glass-bg-button-hover); border-color:rgba(255,255,255,0.28); box-shadow:var(--shadow-md); transform:translateY(-1px); }
-    .btn-secondary:active { background:var(--glass-bg-button-active); transform:translateY(0) scale(0.98); }
+    .btn-secondary:hover { background:rgba(255,255,255,0.22); border-color:rgba(255,255,255,0.35); box-shadow:var(--shadow-md); transform:translateY(-1px); }
+    .btn-secondary:active { background:rgba(255,255,255,0.06); transform:translateY(0) scale(0.98); }
 
     .btn-block { display:flex; width:100%; }
 
@@ -505,7 +522,12 @@
 
       .stats-row { gap:8px; }
 
-      .btn-row { flex-direction:column; gap:10px; }
+      .file-bar { padding:10px 14px; }
+      .file-bar__name { font-size:12px; }
+
+      .btn-row { flex-direction:row; gap:12px; }
+      .btn-row .btn { height:56px; font-size:15px; padding:0 16px; }
+      .btn-row .btn svg { width:17px; height:17px; }
 
       .day-card { padding:14px 16px; }
       .day-card__header { flex-direction:column; gap:2px; }
@@ -582,10 +604,12 @@
         <span class="stat-pill__value" id="statHours">0</span>
         <span class="stat-pill__label">加班小时</span>
       </div>
-      <div class="stat-pill">
-        <span class="stat-pill__value" id="statFile">—</span>
-        <span class="stat-pill__label">已加载文件</span>
-      </div>
+    </div>
+    <div class="file-bar" id="fileBar">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;opacity:0.5;">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+      </svg>
+      <span class="file-bar__name" id="statFile">未加载文件</span>
     </div>
 
     <!-- Action Buttons -->
@@ -763,11 +787,15 @@
         el.textContent = '已选择：' + currentFileName;
         el.classList.remove('is-empty');
         dropZone.classList.add('has-file');
+        // Show filename in file bar immediately
+        document.getElementById('statFile').textContent = currentFileName;
+        document.getElementById('fileBar').classList.add('visible');
         loadDataToMemory(input.files[0]);
       } else {
         el.textContent = '未选择文件';
         el.classList.add('is-empty');
         dropZone.classList.remove('has-file');
+        document.getElementById('fileBar').classList.remove('visible');
       }
     }
 
@@ -777,6 +805,7 @@
         globalData = JSON.parse(text);
         document.getElementById('result').innerHTML = "";
         document.getElementById('statsRow').classList.remove('visible');
+        document.getElementById('fileBar').classList.remove('visible');
       } catch (err) {
         alert("JSON 解析失败，请检查文件格式");
       }
@@ -810,17 +839,15 @@
 
     function updateStats(daysCount, totalHours) {
       var row = document.getElementById('statsRow');
-      row.classList.add('visible');
-      // Force re-trigger animation by removing/re-adding visible
-      row.classList.remove('visible');
+      var bar = document.getElementById('fileBar');
+      // Force re-trigger animation
+      row.classList.remove('visible'); bar.classList.remove('visible');
       void row.offsetWidth;
-      row.classList.add('visible');
+      row.classList.add('visible'); bar.classList.add('visible');
 
       animateCountUp(document.getElementById('statDays'), daysCount, 700, 0, '');
       animateCountUp(document.getElementById('statHours'), totalHours, 900, 1, '');
-      document.getElementById('statFile').textContent = currentFileName.length > 12
-        ? currentFileName.slice(0, 10) + '…'
-        : currentFileName;
+      document.getElementById('statFile').textContent = currentFileName;
     }
 
     // ============================================================
