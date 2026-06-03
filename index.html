@@ -2,445 +2,1019 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>加班统计工具</title>
-  <link rel="icon" type="image/png" sizes="180x180" href="./icon.png">
-  <link rel="apple-touch-icon" sizes="180x180" href="./icon.png">
+  <link rel="icon" type="image/png" sizes="180x180" href="./icon.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="./icon.png" />
 
   <style>
+    /* ============================================================
+       CSS Custom Properties — Apple Liquid Glass Design System
+       ============================================================ */
+    :root {
+      /* Glass surfaces */
+      --glass-bg-card: rgba(255, 255, 255, 0.07);
+      --glass-bg-elevated: rgba(255, 255, 255, 0.12);
+      --glass-bg-button: rgba(255, 255, 255, 0.10);
+      --glass-bg-button-hover: rgba(255, 255, 255, 0.18);
+      --glass-bg-button-active: rgba(255, 255, 255, 0.04);
+      --glass-bg-input: rgba(0, 0, 0, 0.30);
+      --glass-bg-overlay: rgba(20, 20, 30, 0.94);
+
+      /* Glass borders */
+      --glass-border: 1px solid rgba(255, 255, 255, 0.10);
+      --glass-border-strong: 1px solid rgba(255, 255, 255, 0.20);
+      --glass-border-accent: 1px solid rgba(10, 132, 255, 0.35);
+
+      /* Blur & filter */
+      --blur-card: 40px;
+      --blur-button: 20px;
+      --saturate: 180%;
+
+      /* Radii */
+      --radius-xl: 28px;
+      --radius-lg: 22px;
+      --radius-md: 16px;
+      --radius-sm: 12px;
+      --radius-xs: 8px;
+
+      /* Typography */
+      --text-primary: #ffffff;
+      --text-secondary: rgba(255, 255, 255, 0.78);
+      --text-tertiary: rgba(255, 255, 255, 0.50);
+      --text-muted: rgba(255, 255, 255, 0.30);
+
+      /* Accent */
+      --accent: #0A84FF;
+      --accent-glow: rgba(10, 132, 255, 0.40);
+      --accent-soft: rgba(10, 132, 255, 0.12);
+      --accent-hover: #409CFF;
+      --success: #30D158;
+      --danger: #FF453A;
+      --danger-hover: #FF6961;
+
+      /* Shadows */
+      --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+      --shadow-md: 0 4px 20px rgba(0, 0, 0, 0.30);
+      --shadow-lg: 0 8px 40px rgba(0, 0, 0, 0.40);
+      --shadow-glow: 0 0 30px var(--accent-glow);
+
+      /* Spacing */
+      --safe-bottom: env(safe-area-inset-bottom, 16px);
+    }
+
+    /* ============================================================
+       Reset & Base
+       ============================================================ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html {
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      -webkit-tap-highlight-color: transparent;
+    }
+
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif;
-      margin: 0;
-      padding: 24px 16px;
-      background: #f5f5f7;
-      color: #1d1d1f;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", "Helvetica Neue", sans-serif;
+      min-height: 100dvh;
+      color: var(--text-primary);
       line-height: 1.5;
+      background: #0a0a0f;
+      overflow-x: hidden;
+      overscroll-behavior: none;
     }
 
+    /* ============================================================
+       Phase 1: Background — Orbs + Bokeh Particles
+       ============================================================ */
+    .bg-scene {
+      position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none;
+    }
+
+    .bg-orb {
+      position: absolute; border-radius: 50%; filter: blur(120px); opacity: 0.55; will-change: transform;
+    }
+    .bg-orb--1 { width:520px; height:520px; background:radial-gradient(circle at 30% 30%, #3b82f6, #1e3a8a); top:-10%; left:-8%; animation:orbFloat1 18s ease-in-out infinite; }
+    .bg-orb--2 { width:440px; height:440px; background:radial-gradient(circle at 60% 40%, #8b5cf6, #4c1d95); top:35%; right:-12%; animation:orbFloat2 22s ease-in-out infinite; }
+    .bg-orb--3 { width:360px; height:360px; background:radial-gradient(circle at 50% 50%, #06b6d4, #164e63); bottom:-12%; left:15%; animation:orbFloat3 20s ease-in-out infinite; }
+    .bg-orb--4 { width:280px; height:280px; background:radial-gradient(circle at 40% 40%, rgba(10,132,255,0.7), rgba(10,132,255,0.1)); top:55%; left:50%; animation:orbFloat4 24s ease-in-out infinite; }
+
+    @keyframes orbFloat1 {
+      0%,100%{transform:translate(0,0) scale(1)} 25%{transform:translate(60px,40px) scale(1.12)} 50%{transform:translate(-20px,80px) scale(0.94)} 75%{transform:translate(-50px,-20px) scale(1.06)}
+    }
+    @keyframes orbFloat2 {
+      0%,100%{transform:translate(0,0) scale(1)} 25%{transform:translate(-70px,-30px) scale(1.08)} 50%{transform:translate(30px,-60px) scale(0.92)} 75%{transform:translate(50px,40px) scale(1.10)}
+    }
+    @keyframes orbFloat3 {
+      0%,100%{transform:translate(0,0) scale(1)} 33%{transform:translate(50px,-50px) scale(1.10)} 66%{transform:translate(-40px,30px) scale(0.95)}
+    }
+    @keyframes orbFloat4 {
+      0%,100%{transform:translate(0,0) scale(1)} 25%{transform:translate(-30px,-60px) scale(1.15)} 50%{transform:translate(40px,-20px) scale(0.88)} 75%{transform:translate(-50px,30px) scale(1.05)}
+    }
+
+    /* Noise texture */
+    .bg-noise {
+      position:fixed; inset:0; z-index:1; pointer-events:none; opacity:0.025;
+      background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+      background-size:200px 200px;
+    }
+
+    /* Phase 1: Floating bokeh particles */
+    .particle-field {
+      position:fixed; inset:0; z-index:2; pointer-events:none; overflow:hidden;
+    }
+    .particle {
+      position:absolute; border-radius:50%; background:rgba(255,255,255,0.12); opacity:0; animation:bokehFloat linear infinite;
+    }
+    .p1 { width:6px; height:6px; left:8%;  animation-duration:14s; animation-delay:0s; }
+    .p2 { width:4px; height:4px; left:20%; animation-duration:18s; animation-delay:2s; }
+    .p3 { width:8px; height:8px; left:33%; animation-duration:16s; animation-delay:5s; }
+    .p4 { width:3px; height:3px; left:46%; animation-duration:20s; animation-delay:1s; }
+    .p5 { width:5px; height:5px; left:58%; animation-duration:15s; animation-delay:7s; }
+    .p6 { width:7px; height:7px; left:70%; animation-duration:22s; animation-delay:3s; }
+    .p7 { width:4px; height:4px; left:82%; animation-duration:17s; animation-delay:6s; }
+    .p8 { width:6px; height:6px; left:5%;  animation-duration:19s; animation-delay:9s; }
+    .p9 { width:3px; height:3px; left:26%; animation-duration:21s; animation-delay:4s; }
+    .p10{ width:5px; height:5px; left:54%; animation-duration:13s; animation-delay:8s; }
+    .p11{ width:4px; height:4px; left:66%; animation-duration:23s; animation-delay:2s; }
+    .p12{ width:3px; height:3px; left:90%; animation-duration:15s; animation-delay:11s; }
+
+    @keyframes bokehFloat {
+      0%   { opacity:0;    transform:translateY(105vh) translateX(0) scale(0); }
+      8%   { opacity:0.45; }
+      30%  { opacity:0.25; transform:translateY(65vh) translateX(18px) scale(1); }
+      60%  { opacity:0.10; transform:translateY(30vh) translateX(-12px) scale(0.7); }
+      92%  { opacity:0.03; }
+      100% { opacity:0;    transform:translateY(-5vh) translateX(0) scale(0.15); }
+    }
+
+    /* ============================================================
+       Phase 2: Hero Section
+       ============================================================ */
+    .hero {
+      position:relative; z-index:10; text-align:center; padding:50px 20px 8px;
+    }
+
+    .hero-orb {
+      width:120px; height:120px; margin:0 auto 24px; border-radius:50%;
+      background:
+        radial-gradient(circle at 35% 35%, rgba(255,255,255,0.25) 0%, rgba(10,132,255,0.12) 35%, rgba(10,132,255,0.03) 65%, transparent 100%);
+      box-shadow:
+        0 0 60px rgba(10,132,255,0.25),
+        0 0 120px rgba(10,132,255,0.10),
+        inset 0 0 30px rgba(255,255,255,0.06);
+      backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
+      border:1px solid rgba(255,255,255,0.08);
+      animation:heroOrbPulse 5s ease-in-out infinite;
+      display:flex; align-items:center; justify-content:center;
+    }
+
+    /* Inner clock icon inside orb */
+    .hero-orb__icon {
+      width:44px; height:44px; color:rgba(255,255,255,0.7);
+    }
+
+    @keyframes heroOrbPulse {
+      0%,100% {
+        transform:scale(1);
+        box-shadow:0 0 60px rgba(10,132,255,0.25),0 0 120px rgba(10,132,255,0.10),inset 0 0 30px rgba(255,255,255,0.06);
+      }
+      50% {
+        transform:scale(1.06);
+        box-shadow:0 0 80px rgba(10,132,255,0.38),0 0 160px rgba(10,132,255,0.18),inset 0 0 45px rgba(255,255,255,0.12);
+      }
+    }
+
+    .hero-title {
+      font-size:28px; font-weight:600; letter-spacing:-0.02em; color:var(--text-primary); margin:0 0 6px;
+    }
+    .hero-subtitle {
+      font-size:14px; color:var(--text-secondary); margin:0 0 8px;
+    }
+    .hero-subtitle code {
+      background:rgba(255,255,255,0.08); padding:3px 8px; border-radius:6px; font-size:13px; font-weight:500; border:1px solid rgba(255,255,255,0.06);
+    }
+
+    /* ============================================================
+       Main Container
+       ============================================================ */
     .container {
-      max-width: 600px;
-      margin: 0 auto;
-      text-align: center;
+      position:relative; z-index:10; max-width:560px; margin:0 auto; padding:8px 20px calc(32px + var(--safe-bottom));
     }
 
-    h1 { font-size: 28px; margin: 0 0 16px; font-weight: 600; }
-    h2 { font-size: 22px; margin: 0 0 16px; color: #007AFF; }
-    
-    .description {
-      font-size: 16px;
-      color: #6e6e73;
-      margin-bottom: 20px;
-      padding: 0 10px;
+    /* ============================================================
+       Phase 3: Drop Zone
+       ============================================================ */
+    .drop-zone {
+      position:relative;
+      border:2px dashed rgba(255,255,255,0.12);
+      border-radius:var(--radius-lg);
+      padding:34px 24px; text-align:center; cursor:pointer;
+      background:rgba(255,255,255,0.02);
+      transition:border-color 0.3s ease, background 0.3s ease, box-shadow 0.3s ease, transform 0.2s ease;
+      margin-bottom:12px;
+    }
+    .drop-zone:hover { border-color:rgba(255,255,255,0.25); background:rgba(255,255,255,0.04); }
+
+    .drop-zone.dragover {
+      border-color:var(--accent); border-style:solid;
+      background:var(--accent-soft);
+      box-shadow:0 0 50px var(--accent-glow), inset 0 0 40px rgba(10,132,255,0.04);
+      transform:scale(1.015);
     }
 
-    code { background: #e9e9eb; padding: 2px 6px; border-radius: 4px; font-size: 15px; }
+    .drop-zone.has-file {
+      border-style:solid; border-color:rgba(48,209,88,0.30); background:rgba(48,209,88,0.04);
+    }
 
-    /* 通用按钮样式 */
+    .drop-zone__icon { color:var(--text-tertiary); margin-bottom:10px; transition:color 0.3s ease; }
+    .dragover .drop-zone__icon { color:var(--accent); }
+    .has-file .drop-zone__icon { color:var(--success); }
+
+    .drop-zone__text { font-size:15px; font-weight:500; color:var(--text-secondary); margin:0 0 4px; }
+    .drop-zone__hint { font-size:12px; color:var(--text-muted); margin:0; }
+
+    #fileInput { display:none; }
+
+    .file-indicator {
+      font-size:13px; color:var(--success); text-align:center; min-height:18px; margin:0 0 16px; font-weight:500; transition:color 0.2s ease;
+    }
+    .file-indicator.is-empty { color:var(--text-muted); font-weight:400; }
+
+    /* ============================================================
+       Phase 4: Stats Pills
+       ============================================================ */
+    .stats-row {
+      display:none; gap:10px; margin-bottom:16px;
+    }
+    .stats-row.visible { display:flex; }
+
+    .stat-pill {
+      flex:1; min-width:0;
+      background:var(--glass-bg-card);
+      backdrop-filter:blur(var(--blur-button)) saturate(var(--saturate));
+      -webkit-backdrop-filter:blur(var(--blur-button)) saturate(var(--saturate));
+      border:var(--glass-border); border-radius:var(--radius-sm);
+      padding:14px 12px; text-align:center;
+      transition:background 0.3s ease, border-color 0.3s ease, transform 0.2s ease;
+      animation:pillPopIn 0.35s cubic-bezier(0.22,0.61,0.36,1) forwards;
+      opacity:0;
+    }
+    .stat-pill:nth-child(1) { animation-delay:0ms; }
+    .stat-pill:nth-child(2) { animation-delay:80ms; }
+    .stat-pill:nth-child(3) { animation-delay:160ms; }
+
+    @keyframes pillPopIn {
+      from { opacity:0; transform:translateY(10px) scale(0.92); }
+      to   { opacity:1; transform:translateY(0) scale(1); }
+    }
+
+    .stat-pill__value {
+      display:block; font-size:22px; font-weight:700; color:var(--accent); letter-spacing:-0.02em; line-height:1.2;
+      font-variant-numeric:tabular-nums;
+    }
+    .stat-pill__label {
+      display:block; font-size:10px; color:var(--text-tertiary); text-transform:uppercase; letter-spacing:0.06em; margin-top:4px;
+    }
+
+    /* ============================================================
+       Buttons
+       ============================================================ */
+    .btn-row {
+      display:flex; gap:12px; margin-bottom:16px;
+    }
+    .btn-row .btn { flex:1; }
+
     .btn {
-      display: block;
-      width: 100%;
-      max-width: 320px;
-      height: 50px;
-      margin: 0 auto 12px;
-      font-size: 17px;
-      font-weight: 500;
-      line-height: 50px;
-      border: none;
-      border-radius: 12px;
-      background: #007AFF;
-      color: white;
-      cursor: pointer;
-      -webkit-appearance: none;
-      transition: background 0.2s;
+      display:inline-flex; align-items:center; justify-content:center; gap:8px;
+      font-family:inherit; font-size:16px; font-weight:500; letter-spacing:-0.01em;
+      border:none; border-radius:var(--radius-md); cursor:pointer;
+      -webkit-appearance:none; user-select:none; touch-action:manipulation;
+      transition:background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease, opacity 0.2s ease;
+      position:relative; overflow:hidden; white-space:nowrap;
     }
-    .btn:active { background: #0062cc; }
-    
+
+    .btn::after {
+      content:""; position:absolute; top:0; left:0; right:0; height:50%;
+      background:linear-gradient(to bottom, rgba(255,255,255,0.10), transparent);
+      border-radius:inherit; pointer-events:none; opacity:0; transition:opacity 0.25s ease;
+    }
+    .btn:hover::after { opacity:1; }
+
+    .btn-primary {
+      background:var(--accent); color:#fff; height:50px; padding:0 28px; box-shadow:0 4px 20px var(--accent-glow);
+    }
+    .btn-primary:hover { background:var(--accent-hover); box-shadow:0 6px 28px rgba(64,156,255,0.50); transform:translateY(-1px); }
+    .btn-primary:active { background:#0070e0; box-shadow:0 2px 10px var(--accent-glow); transform:translateY(0) scale(0.98); }
+
     .btn-secondary {
-      background: #e9e9eb;
-      color: #007AFF;
+      background:var(--glass-bg-button);
+      backdrop-filter:blur(var(--blur-button)) saturate(var(--saturate));
+      -webkit-backdrop-filter:blur(var(--blur-button)) saturate(var(--saturate));
+      border:var(--glass-border); color:var(--text-primary); height:50px; padding:0 28px;
     }
-    .btn-secondary:active { background: #d1d1d6; }
+    .btn-secondary:hover { background:var(--glass-bg-button-hover); border-color:rgba(255,255,255,0.28); box-shadow:var(--shadow-md); transform:translateY(-1px); }
+    .btn-secondary:active { background:var(--glass-bg-button-active); transform:translateY(0) scale(0.98); }
+
+    .btn-block { display:flex; width:100%; }
+
+    .btn-sm { height:38px; padding:0 16px; font-size:14px; border-radius:var(--radius-sm); }
 
     .btn-danger {
-      background: #ff3b30;
-      color: white;
-      height: 32px;
-      line-height: 32px;
-      font-size: 14px;
-      width: auto;
-      padding: 0 12px;
-      margin: 0;
-      border-radius: 8px;
+      background:rgba(255,69,58,0.16);
+      backdrop-filter:blur(var(--blur-button)) saturate(var(--saturate));
+      -webkit-backdrop-filter:blur(var(--blur-button)) saturate(var(--saturate));
+      border:1px solid rgba(255,69,58,0.22); color:var(--danger);
+      height:34px; padding:0 14px; font-size:13px; font-weight:500; border-radius:var(--radius-xs);
     }
+    .btn-danger:hover { background:rgba(255,69,58,0.26); border-color:rgba(255,69,58,0.40); color:var(--danger-hover); }
+    .btn-danger:active { background:rgba(255,69,58,0.08); }
 
-    .btn-small {
-      height: 36px;
-      line-height: 36px;
-      font-size: 14px;
-      width: auto;
-      padding: 0 16px;
-      display: inline-block;
-      margin: 0;
-    }
+    .btn:disabled { opacity:0.35; pointer-events:none; cursor:not-allowed; }
 
-    .file-name {
-      min-height: 20px;
-      font-size: 15px;
-      color: #007AFF;
-      margin: 0 0 20px;
-      padding: 0 16px;
-    }
-
-    /* 结果和表格容器 */
-    .card {
-      background: white;
-      padding: 22px;
-      border-radius: 18px;
-      box-shadow: 0 3px 12px rgba(0,0,0,0.06);
-      font-size: 16px;
-      text-align: left;
-      margin-top: 10px;
-      overflow-x: auto; /* 允许表格横向滚动 */
-    }
-
-    hr { border: 0; border-top: 1px solid #eee; margin: 16px 0; }
-    .total { font-weight: bold; font-size: 18px; color: #ff3b30; display: block; margin-top: 16px; }
-
-    /* 编辑器表格样式 */
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 14px;
-    }
-    th, td {
-      padding: 10px 8px;
-      border-bottom: 1px solid #eee;
-      text-align: left;
-    }
-    th { color: #8e8e93; font-weight: 500; }
-    
-    /* 输入框组 */
+    /* ============================================================
+       Inputs
+       ============================================================ */
     .input-group {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 16px;
-      justify-content: center;
-      align-items: center;
-      background: #f2f2f7;
-      padding: 10px;
-      border-radius: 12px;
+      display:flex; gap:10px; margin-bottom:18px; align-items:center; flex-wrap:wrap;
     }
     input[type="date"], input[type="time"] {
-      border: 1px solid #d1d1d6;
-      border-radius: 8px;
-      padding: 6px;
-      font-size: 16px;
-      background: white;
-      -webkit-appearance: none;
+      font-family:inherit; font-size:15px; padding:10px 14px; border-radius:var(--radius-sm);
+      border:var(--glass-border);
+      background:var(--glass-bg-input);
+      backdrop-filter:blur(20px) saturate(var(--saturate));
+      -webkit-backdrop-filter:blur(20px) saturate(var(--saturate));
+      color:var(--text-primary); color-scheme:dark; -webkit-appearance:none; outline:none;
+      transition:border-color 0.2s ease, box-shadow 0.2s ease; min-width:0;
+    }
+    input[type="date"]:focus, input[type="time"]:focus {
+      border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft);
+    }
+    input[type="date"]::-webkit-calendar-picker-indicator,
+    input[type="time"]::-webkit-calendar-picker-indicator { filter:invert(1); cursor:pointer; opacity:0.7; }
+
+    /* ============================================================
+       Phase 5: Result Day Cards
+       ============================================================ */
+    .section-title {
+      font-size:18px; font-weight:600; color:var(--text-primary); margin:20px 0 10px; letter-spacing:-0.01em;
     }
 
-    /* 视图切换控制 */
-    .view-section { display: none; }
-    .view-section.active { display: block; }
+    .day-card {
+      background:var(--glass-bg-card);
+      backdrop-filter:blur(var(--blur-button)) saturate(var(--saturate));
+      -webkit-backdrop-filter:blur(var(--blur-button)) saturate(var(--saturate));
+      border:var(--glass-border); border-radius:var(--radius-md);
+      padding:16px 18px; margin-bottom:8px; border-left:3px solid transparent;
+      opacity:0; transform:translateY(14px);
+      animation:cardStaggerIn 0.4s cubic-bezier(0.22,0.61,0.36,1) forwards;
+      animation-delay:calc(var(--i, 0) * 50ms);
+      transition:border-color 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
+    }
 
-    #fileInput { display: none; }
+    .day-card--overtime { border-left-color:var(--accent); }
+    .day-card--zero { opacity:0; border-left-color:rgba(255,255,255,0.06); animation-name:cardStaggerInZero; }
+
+    @keyframes cardStaggerIn {
+      from { opacity:0; transform:translateY(14px) scale(0.97); }
+      to   { opacity:1; transform:translateY(0) scale(1); }
+    }
+    @keyframes cardStaggerInZero {
+      from { opacity:0; transform:translateY(14px) scale(0.97); }
+      to   { opacity:0.45; transform:translateY(0) scale(1); }
+    }
+
+    .day-card__header {
+      display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:4px;
+    }
+    .day-card__date { font-weight:600; font-size:15px; color:var(--text-primary); }
+    .day-card__weekday { font-size:12px; font-weight:400; color:var(--text-tertiary); margin-left:6px; }
+    .day-card__duration { font-weight:700; font-size:16px; color:var(--accent); white-space:nowrap; }
+    .day-card--zero .day-card__duration { color:var(--text-muted); font-weight:500; }
+    .day-card__times { font-size:13px; color:var(--text-tertiary); }
+
+    /* Total summary card */
+    .total-card {
+      display:flex; align-items:center; justify-content:space-between; margin-top:14px;
+      padding:20px 22px;
+      background:var(--glass-bg-elevated);
+      backdrop-filter:blur(var(--blur-button)) saturate(var(--saturate));
+      -webkit-backdrop-filter:blur(var(--blur-button)) saturate(var(--saturate));
+      border:var(--glass-border-strong); border-radius:var(--radius-md);
+      box-shadow:var(--shadow-md);
+    }
+    .total-card__label { font-size:17px; font-weight:600; color:var(--text-primary); }
+    .total-card__value { font-size:26px; font-weight:700; color:var(--accent); letter-spacing:-0.02em; font-variant-numeric:tabular-nums; }
+
+    /* Empty / Error */
+    .empty-state { text-align:center; padding:28px 16px; color:var(--text-muted); font-size:15px; }
+
+    /* ============================================================
+       Phase 6: Editor Overlay (Bottom Sheet)
+       ============================================================ */
+    .editor-overlay {
+      position:fixed; inset:0; z-index:100; display:flex; align-items:flex-end; justify-content:center;
+      pointer-events:none; opacity:0; transition:opacity 0.35s ease;
+    }
+    .editor-overlay.active { pointer-events:auto; opacity:1; }
+
+    .editor-backdrop {
+      position:absolute; inset:0;
+      background:rgba(0,0,0,0.50);
+      backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
+      cursor:pointer;
+    }
+
+    .editor-panel {
+      position:relative; z-index:1;
+      background:var(--glass-bg-overlay);
+      backdrop-filter:blur(var(--blur-card)) saturate(var(--saturate));
+      -webkit-backdrop-filter:blur(var(--blur-card)) saturate(var(--saturate));
+      border:var(--glass-border); border-bottom:none;
+      border-radius:24px 24px 0 0; max-width:560px; width:100%;
+      max-height:88dvh; overflow-y:auto; -webkit-overflow-scrolling:touch;
+      padding:14px 20px calc(24px + var(--safe-bottom));
+      transform:translateY(100%);
+      transition:transform 0.42s cubic-bezier(0.32,0.72,0,1);
+    }
+    .editor-overlay.active .editor-panel { transform:translateY(0); }
+
+    .editor-handle {
+      width:36px; height:5px; background:rgba(255,255,255,0.22); border-radius:100px; margin:0 auto 16px;
+    }
+
+    .editor-title {
+      font-size:22px; font-weight:600; text-align:center; margin:0 0 4px; color:var(--text-primary);
+    }
+    .editor-subtitle {
+      font-size:13px; color:var(--text-secondary); text-align:center; margin:0 0 18px;
+    }
+
+    .editor-actions {
+      display:flex; flex-direction:column; gap:10px; margin-top:20px;
+    }
+
+    /* Table (inside editor) */
+    .table-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+
+    table { width:100%; border-collapse:collapse; font-size:14px; }
+    th {
+      text-align:left; padding:12px 10px; font-weight:500; font-size:11px; text-transform:uppercase;
+      letter-spacing:0.04em; color:var(--text-tertiary); border-bottom:1px solid rgba(255,255,255,0.08);
+    }
+    td { padding:12px 10px; border-bottom:1px solid rgba(255,255,255,0.05); color:var(--text-secondary); vertical-align:middle; }
+    tr:last-child td { border-bottom:none; }
+    tr:hover td { background:rgba(255,255,255,0.025); }
+    td strong { color:var(--text-primary); font-weight:500; }
+
+    .weekday-tag {
+      display:inline-block; font-size:10px; padding:2px 7px; border-radius:100px; font-weight:500; margin-top:2px;
+      background:rgba(255,255,255,0.07); color:var(--text-tertiary);
+    }
+
+    /* ============================================================
+       Focus & Accessibility
+       ============================================================ */
+    .btn:focus-visible, input:focus-visible {
+      outline:2px solid var(--accent); outline-offset:3px;
+    }
+
+    /* ============================================================
+       Reduced Motion
+       ============================================================ */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration:0.01ms !important; animation-iteration-count:1 !important; transition-duration:0.01ms !important;
+      }
+    }
+
+    /* ============================================================
+       Phase 7: Mobile Responsive (≤480px)
+       ============================================================ */
+    @media (max-width: 480px) {
+      .hero { padding:36px 16px 4px; }
+      .hero-orb { width:96px; height:96px; margin-bottom:18px; }
+      .hero-orb__icon { width:36px; height:36px; }
+      .hero-title { font-size:23px; }
+
+      .container { padding:4px 14px calc(20px + var(--safe-bottom)); }
+
+      .drop-zone { padding:26px 16px; border-radius:var(--radius-md); }
+      .drop-zone__text { font-size:14px; }
+      .drop-zone__icon svg { width:30px; height:30px; }
+
+      .stats-row { gap:8px; }
+
+      .btn-row { flex-direction:column; gap:10px; }
+
+      .day-card { padding:14px 16px; }
+      .day-card__header { flex-direction:column; gap:2px; }
+      .day-card__duration { font-size:15px; }
+      .total-card { padding:16px 18px; flex-direction:column; align-items:flex-start; gap:6px; }
+      .total-card__value { font-size:22px; }
+
+      .editor-panel { border-radius:20px 20px 0 0; max-height:85dvh; padding:12px 16px calc(18px + var(--safe-bottom)); }
+      .input-group { flex-direction:column; gap:8px; }
+      .input-group input { width:100%; }
+      .input-group .btn-sm { width:100%; }
+
+      /* Touch target minimums */
+      .btn-sm { height:44px; padding:0 20px; }
+      .btn-danger { height:38px; padding:0 18px; }
+      input[type="date"], input[type="time"] { padding:12px 14px; font-size:16px; }
+    }
   </style>
 </head>
 <body>
 
+  <!-- ===== Background Scene ===== -->
+  <div class="bg-scene" aria-hidden="true">
+    <div class="bg-orb bg-orb--1"></div>
+    <div class="bg-orb bg-orb--2"></div>
+    <div class="bg-orb bg-orb--3"></div>
+    <div class="bg-orb bg-orb--4"></div>
+  </div>
+  <div class="bg-noise" aria-hidden="true"></div>
+
+  <!-- Phase 1: Floating particles -->
+  <div class="particle-field" aria-hidden="true">
+    <div class="particle p1"></div><div class="particle p2"></div><div class="particle p3"></div>
+    <div class="particle p4"></div><div class="particle p5"></div><div class="particle p6"></div>
+    <div class="particle p7"></div><div class="particle p8"></div><div class="particle p9"></div>
+    <div class="particle p10"></div><div class="particle p11"></div><div class="particle p12"></div>
+  </div>
+
+  <!-- ===== Phase 2: Hero ===== -->
+  <header class="hero">
+    <div class="hero-orb">
+      <svg class="hero-orb__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+      </svg>
+    </div>
+    <h1 class="hero-title">加班时长计算器</h1>
+    <p class="hero-subtitle">拖放 <code>overtime_log.json</code> 自动计算</p>
+  </header>
+
+  <!-- ===== Main Content ===== -->
   <div class="container">
-    
-    <div id="mainView" class="view-section active">
-      <h1>加班时长计算器</h1>
-      <p class="description">选择 <code>overtime_log.json</code> 文件</p>
 
-      <button class="btn" onclick="document.getElementById('fileInput').click()">选择 JSON 文件</button>
-      <div class="file-name" id="fileName">未选择文件</div>
-      
-      <div style="display: flex; gap: 10px; justify-content: center;">
-        <button class="btn" style="flex: 1;" onclick="processFile()">计算加班</button>
-        <button class="btn btn-secondary" style="flex: 1;" onclick="openEditor()">管理数据</button>
+    <!-- Phase 3: Drop Zone -->
+    <div id="dropZone" class="drop-zone" role="button" tabindex="0" aria-label="上传 JSON 文件">
+      <div class="drop-zone__icon">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
       </div>
-
-      <input type="file" id="fileInput" accept=".json" onchange="handleFileSelect()" />
-
-      <div id="result"></div>
+      <p class="drop-zone__text">拖放 JSON 文件到此处</p>
+      <p class="drop-zone__hint">或点击选择文件</p>
+      <input type="file" id="fileInput" accept=".json" />
     </div>
 
-    <div id="editorView" class="view-section">
-      <h1>数据编辑器</h1>
-      <p class="description">修改本月记录 (修改后请下载新文件)</p>
-      
-      <div class="card">
-        <div class="input-group">
-          <input type="date" id="newDate">
-          <input type="time" id="newTime">
-          <button class="btn btn-small" onclick="addEntry()">添加</button>
-        </div>
+    <div class="file-indicator is-empty" id="fileName">未选择文件</div>
 
+    <!-- Phase 4: Stats Pills -->
+    <div class="stats-row" id="statsRow">
+      <div class="stat-pill">
+        <span class="stat-pill__value" id="statDays">0</span>
+        <span class="stat-pill__label">记录天数</span>
+      </div>
+      <div class="stat-pill">
+        <span class="stat-pill__value" id="statHours">0</span>
+        <span class="stat-pill__label">加班小时</span>
+      </div>
+      <div class="stat-pill">
+        <span class="stat-pill__value" id="statFile">—</span>
+        <span class="stat-pill__label">已加载文件</span>
+      </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="processFile()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+        </svg>
+        计算加班
+      </button>
+      <button class="btn btn-secondary" onclick="openEditorOverlay()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+        </svg>
+        管理数据
+      </button>
+    </div>
+
+    <!-- Results -->
+    <div id="result"></div>
+  </div>
+
+  <!-- ===== Phase 6: Editor Overlay ===== -->
+  <div id="editorOverlay" class="editor-overlay">
+    <div class="editor-backdrop" id="editorBackdrop"></div>
+    <div class="editor-panel" id="editorPanel">
+      <div class="editor-handle"></div>
+      <h2 class="editor-title">数据编辑器</h2>
+      <p class="editor-subtitle">修改本月记录 — 修改后请下载新文件</p>
+
+      <div class="input-group">
+        <input type="date" id="newDate" aria-label="选择日期" />
+        <input type="time" id="newTime" aria-label="选择时间" />
+        <button class="btn btn-primary btn-sm" onclick="addEntry()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+          添加
+        </button>
+      </div>
+
+      <div class="table-wrap">
         <table id="dataTable">
           <thead>
-            <tr>
-              <th width="25%">日期</th>
-              <th>打卡时间</th>
-              <th width="15%">操作</th>
-            </tr>
+            <tr><th style="width:25%">日期</th><th>打卡时间</th><th style="width:15%">操作</th></tr>
           </thead>
-          <tbody id="tableBody">
-            </tbody>
+          <tbody id="tableBody"></tbody>
         </table>
       </div>
 
-      <br>
-      <button class="btn" onclick="saveAndDownload()">保存并导出新文件</button>
-      <button class="btn btn-secondary" onclick="switchView('mainView')">返回</button>
+      <div class="editor-actions">
+        <button class="btn btn-primary btn-block" onclick="saveAndDownload()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          保存并导出新文件
+        </button>
+        <button class="btn btn-secondary btn-block" onclick="closeEditorOverlay()">返回计算器</button>
+      </div>
     </div>
-
   </div>
 
   <script>
-    // 全局变量存储数据
+    // ============================================================
+    // Global state
+    // ============================================================
     let globalData = {};
     let currentFileName = "overtime_log.json";
 
+    // ============================================================
+    // Phase 3: Drop Zone Setup
+    // ============================================================
+    (function setupDropZone() {
+      const dropZone = document.getElementById('dropZone');
+      const fileInput = document.getElementById('fileInput');
+
+      dropZone.addEventListener('click', function(e) {
+        if (e.target !== fileInput) fileInput.click();
+      });
+
+      // Keyboard accessibility
+      dropZone.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); }
+      });
+
+      ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(function(ev) {
+        dropZone.addEventListener(ev, function(e) { e.preventDefault(); e.stopPropagation(); });
+      });
+
+      ['dragenter', 'dragover'].forEach(function(ev) {
+        dropZone.addEventListener(ev, function() { dropZone.classList.add('dragover'); });
+      });
+
+      ['dragleave', 'drop'].forEach(function(ev) {
+        dropZone.addEventListener(ev, function() { dropZone.classList.remove('dragover'); });
+      });
+
+      dropZone.addEventListener('drop', function(e) {
+        var files = e.dataTransfer.files;
+        if (files.length > 0) {
+          fileInput.files = files;
+          handleFileSelect();
+        }
+      });
+    })();
+
+    // ============================================================
+    // Phase 6: Editor Overlay Setup
+    // ============================================================
+    document.getElementById('editorBackdrop').addEventListener('click', closeEditorOverlay);
+
+    // Swipe-down-to-close gesture
+    (function setupEditorSwipe() {
+      var panel = document.getElementById('editorPanel');
+      var startY = 0, currentY = 0, isDragging = false;
+
+      panel.addEventListener('touchstart', function(e) {
+        if (panel.scrollTop <= 0) { startY = e.touches[0].clientY; isDragging = true; }
+      }, { passive: true });
+
+      panel.addEventListener('touchmove', function(e) {
+        if (!isDragging) return;
+        currentY = e.touches[0].clientY;
+        var delta = currentY - startY;
+        if (delta > 0) {
+          panel.style.transform = 'translateY(' + delta + 'px)';
+          panel.style.transition = 'none';
+        }
+      }, { passive: true });
+
+      panel.addEventListener('touchend', function() {
+        if (!isDragging) return;
+        isDragging = false;
+        panel.style.transition = '';
+        if (currentY - startY > 100) { closeEditorOverlay(); }
+        else { panel.style.transform = ''; }
+      });
+    })();
+
+    // Escape key to close
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') closeEditorOverlay();
+    });
+
+    function openEditorOverlay() {
+      if (Object.keys(globalData).length === 0) {
+        alert("请先选择并加载一个 JSON 文件");
+        return;
+      }
+      var now = new Date();
+      document.getElementById('newDate').value = now.toISOString().split('T')[0];
+      document.getElementById('newTime').value = now.toTimeString().slice(0, 5);
+      renderEditorTable();
+      document.getElementById('editorOverlay').classList.add('active');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeEditorOverlay() {
+      document.getElementById('editorOverlay').classList.remove('active');
+      document.body.style.overflow = '';
+      var panel = document.getElementById('editorPanel');
+      panel.style.transform = '';
+      panel.style.transition = '';
+    }
+
+    // ============================================================
+    // File handling
+    // ============================================================
     function handleFileSelect() {
-      const input = document.getElementById('fileInput');
-      const el = document.getElementById('fileName');
+      var input = document.getElementById('fileInput');
+      var el = document.getElementById('fileName');
+      var dropZone = document.getElementById('dropZone');
       if (input.files.length > 0) {
         currentFileName = input.files[0].name;
         el.textContent = '已选择：' + currentFileName;
-        el.style.color = '#007AFF';
-        // 预加载数据到内存
+        el.classList.remove('is-empty');
+        dropZone.classList.add('has-file');
         loadDataToMemory(input.files[0]);
       } else {
         el.textContent = '未选择文件';
-        el.style.color = '#999';
+        el.classList.add('is-empty');
+        dropZone.classList.remove('has-file');
       }
     }
 
     async function loadDataToMemory(file) {
       try {
-        const text = await file.text();
+        var text = await file.text();
         globalData = JSON.parse(text);
-        // 清空之前的结果
-        document.getElementById('result').innerHTML = ""; 
+        document.getElementById('result').innerHTML = "";
+        document.getElementById('statsRow').classList.remove('visible');
       } catch (err) {
         alert("JSON 解析失败，请检查文件格式");
       }
     }
 
-    // 切换视图
-    function switchView(viewId) {
-      document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
-      document.getElementById(viewId).classList.add('active');
+    // ============================================================
+    // Phase 4: Stats & CountUp Animation
+    // ============================================================
+    function shouldAnimate() {
+      return !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     }
 
-    // 打开编辑器
-    function openEditor() {
-      if (Object.keys(globalData).length === 0) {
-        alert("请先选择并加载一个 JSON 文件");
+    function animateCountUp(el, target, duration, decimals, suffix) {
+      decimals = (decimals === undefined) ? 0 : decimals;
+      suffix = suffix || '';
+      if (!shouldAnimate()) {
+        el.textContent = (decimals > 0 ? target.toFixed(decimals) : Math.round(target)) + suffix;
         return;
       }
-      
-      // 设置默认日期和时间为现在
-      const now = new Date();
-      // YYYY-MM-DD
-      document.getElementById('newDate').value = now.toISOString().split('T')[0];
-      // HH:MM (截取本地时间字符串的前5位)
-      document.getElementById('newTime').value = now.toTimeString().slice(0, 5);
-      
-      renderEditorTable();
-      switchView('editorView');
+      var start = performance.now();
+      function update(now) {
+        var elapsed = now - start;
+        var progress = Math.min(elapsed / duration, 1);
+        var eased = 1 - Math.pow(1 - progress, 3); // easeOutCubic
+        var current = eased * target;
+        el.textContent = (decimals > 0 ? current.toFixed(decimals) : Math.round(current)) + suffix;
+        if (progress < 1) requestAnimationFrame(update);
+      }
+      requestAnimationFrame(update);
     }
 
-    // 渲染编辑器表格 (只显示当月，和计算逻辑一致)
+    function updateStats(daysCount, totalHours) {
+      var row = document.getElementById('statsRow');
+      row.classList.add('visible');
+      // Force re-trigger animation by removing/re-adding visible
+      row.classList.remove('visible');
+      void row.offsetWidth;
+      row.classList.add('visible');
+
+      animateCountUp(document.getElementById('statDays'), daysCount, 700, 0, '');
+      animateCountUp(document.getElementById('statHours'), totalHours, 900, 1, '');
+      document.getElementById('statFile').textContent = currentFileName.length > 12
+        ? currentFileName.slice(0, 10) + '…'
+        : currentFileName;
+    }
+
+    // ============================================================
+    // Editor Table
+    // ============================================================
     function renderEditorTable() {
-      const tbody = document.getElementById('tableBody');
+      var tbody = document.getElementById('tableBody');
       tbody.innerHTML = '';
 
-      const now = new Date();
-      const currentYear = now.getFullYear();
-      const currentMonth = now.getMonth() + 1;
-      const weekdayNames = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
+      var now = new Date();
+      var currentYear = now.getFullYear();
+      var currentMonth = now.getMonth() + 1;
+      var weekdayNames = ["周日","周一","周二","周三","周四","周五","周六"];
 
-      // 转换为数组方便排序
-      const rows = [];
-      for (const [dateStr, value] of Object.entries(globalData)) {
-        if (!value?.entries) continue;
-        const d = new Date(dateStr);
-        // 依然只展示当月，防止列表过长
+      var rows = [];
+      for (var dateStr in globalData) {
+        if (!globalData.hasOwnProperty(dateStr)) continue;
+        var value = globalData[dateStr];
+        if (!value || !value.entries) continue;
+        var d = new Date(dateStr);
         if (d.getFullYear() !== currentYear || d.getMonth() + 1 !== currentMonth) continue;
-        
-        const entries = Array.isArray(value.entries) ? value.entries : [value.entries];
-        // 排序时间戳
-        entries.sort((a, b) => a - b);
-        
-        // 格式化时间 HH:MM
-        const timeStrings = entries.map(ts => {
-            const dt = new Date(ts);
-            return dt.toTimeString().slice(0, 5);
+
+        var entries = Array.isArray(value.entries) ? value.entries.slice() : [value.entries];
+        entries.sort(function(a,b) { return a - b; });
+
+        var timeStrings = entries.map(function(ts) {
+          return new Date(ts).toTimeString().slice(0, 5);
         });
 
         rows.push({
-            dateStr: dateStr,
-            weekday: weekdayNames[d.getDay()],
-            times: timeStrings.join(", "),
-            originalDate: d
+          dateStr: dateStr,
+          weekday: weekdayNames[d.getDay()],
+          times: timeStrings.join(", "),
+          originalDate: d
         });
       }
 
-      // 按日期排序
-      rows.sort((a, b) => a.originalDate - b.originalDate);
+      rows.sort(function(a,b) { return a.originalDate - b.originalDate; });
 
       if (rows.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:#999;">本月无记录</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:var(--text-muted);padding:24px;">本月无记录</td></tr>';
         return;
       }
 
-      rows.forEach(row => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td><strong>${row.dateStr.slice(5)}</strong><br><span style="font-size:12px;color:#888">${row.weekday}</span></td>
-          <td>${row.times}</td>
-          <td><button class="btn btn-danger" onclick="deleteEntry('${row.dateStr}')">删除</button></td>
-        `;
+      rows.forEach(function(row) {
+        var tr = document.createElement('tr');
+        tr.innerHTML =
+          '<td><strong>' + row.dateStr.slice(5) + '</strong><br><span class="weekday-tag">' + row.weekday + '</span></td>' +
+          '<td>' + row.times + '</td>' +
+          '<td><button class="btn btn-danger" onclick="deleteEntry(\'' + row.dateStr + '\')">删除</button></td>';
         tbody.appendChild(tr);
       });
     }
 
-    // 添加记录
     function addEntry() {
-        const dateVal = document.getElementById('newDate').value;
-        const timeVal = document.getElementById('newTime').value;
+      var dateVal = document.getElementById('newDate').value;
+      var timeVal = document.getElementById('newTime').value;
+      if (!dateVal || !timeVal) { alert("请选择完整的日期和时间"); return; }
 
-        if (!dateVal || !timeVal) {
-            alert("请选择完整的日期和时间");
-            return;
-        }
+      var newTimestamp = new Date(dateVal + 'T' + timeVal + ':00').getTime();
 
-        // 构建时间戳 (毫秒)
-        const newTimestamp = new Date(`${dateVal}T${timeVal}:00`).getTime();
+      if (!globalData[dateVal]) { globalData[dateVal] = { entries: [] }; }
+      else if (!Array.isArray(globalData[dateVal].entries)) { globalData[dateVal].entries = [globalData[dateVal].entries]; }
 
-        if (!globalData[dateVal]) {
-            // 如果当天没有记录，创建新对象
-            globalData[dateVal] = { entries: [] };
-        } else if (!Array.isArray(globalData[dateVal].entries)) {
-            // 兼容旧格式，转为数组
-            globalData[dateVal].entries = [globalData[dateVal].entries];
-        }
-
-        // 添加并重新渲染
-        globalData[dateVal].entries.push(newTimestamp);
-        
-        // 简单的去重排序
-        globalData[dateVal].entries.sort((a,b) => a-b);
-        
-        renderEditorTable();
+      globalData[dateVal].entries.push(newTimestamp);
+      globalData[dateVal].entries.sort(function(a,b) { return a - b; });
+      renderEditorTable();
     }
 
-    // 删除记录
     function deleteEntry(dateStr) {
-        if(confirm(`确定要删除 ${dateStr} 的所有打卡记录吗？`)) {
-            delete globalData[dateStr];
-            renderEditorTable();
-        }
+      if (confirm('确定要删除 ' + dateStr + ' 的所有打卡记录吗？')) {
+        delete globalData[dateStr];
+        renderEditorTable();
+      }
     }
 
-    // 保存并下载
     function saveAndDownload() {
-        const dataStr = JSON.stringify(globalData, null, 2);
-        const blob = new Blob([dataStr], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
-        
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = currentFileName; // 使用原文件名
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        
-        alert("文件已生成下载，请用新文件替换旧文件。");
+      var dataStr = JSON.stringify(globalData, null, 2);
+      var blob = new Blob([dataStr], { type: "application/json" });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url; a.download = currentFileName;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      alert("文件已生成下载，请用新文件替换旧文件。");
     }
 
-    // --- 原有的计算逻辑 (稍微修改以使用 globalData) ---
+    // ============================================================
+    // Overtime Calculation + Phase 5: Day Cards
+    // ============================================================
     function formatDuration(seconds) {
       if (seconds <= 0) return "0小时0分钟";
-      const h = Math.floor(seconds / 3600);
-      const m = Math.floor((seconds % 3600) / 60);
-      return `${h}小时${m}分钟`;
+      var h = Math.floor(seconds / 3600);
+      var m = Math.floor((seconds % 3600) / 60);
+      return h + "小时" + m + "分钟";
     }
 
     async function processFile() {
-      // 检查内存中是否有数据
       if (Object.keys(globalData).length === 0) {
-        // 尝试从 input 再次读取
-        const file = document.getElementById('fileInput').files[0];
-        if (!file) {
-            alert("请先选择一个 JSON 文件");
-            return;
-        }
+        var file = document.getElementById('fileInput').files[0];
+        if (!file) { alert("请先选择一个 JSON 文件"); return; }
         await loadDataToMemory(file);
       }
 
-      const now = new Date();
-      const currentYear = now.getFullYear();
-      const currentMonth = now.getMonth() + 1;
-      const weekdayNames = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
-      let totalSec = 0;
-      const details = [];
+      var now = new Date();
+      var currentYear = now.getFullYear();
+      var currentMonth = now.getMonth() + 1;
+      var weekdayNames = ["周日","周一","周二","周三","周四","周五","周六"];
+      var totalSec = 0;
+      var details = [];
 
       try {
-        for (const [dateStr, value] of Object.entries(globalData)) {
-          if (!value?.entries) continue;
-          const entries = Array.isArray(value.entries) ? value.entries : [value.entries];
-          const datetimes = entries.map(ts => new Date(ts)).sort((a, b) => a - b);
-          const d = new Date(dateStr);
+        for (var dateStr in globalData) {
+          if (!globalData.hasOwnProperty(dateStr)) continue;
+          var value = globalData[dateStr];
+          if (!value || !value.entries) continue;
+          var entries = Array.isArray(value.entries) ? value.entries.slice() : [value.entries];
+          var datetimes = entries.map(function(ts) { return new Date(ts); }).sort(function(a,b) { return a - b; });
+          var d = new Date(dateStr);
           if (d.getFullYear() !== currentYear || d.getMonth() + 1 !== currentMonth) continue;
 
-          const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-          let overtimeSec = 0;
+          var isWeekend = d.getDay() === 0 || d.getDay() === 6;
+          var overtimeSec = 0;
 
           if (isWeekend && datetimes.length >= 2) {
             overtimeSec = (datetimes[datetimes.length - 1] - datetimes[0]) / 1000;
           } else if (!isWeekend) {
-            const workEnd = new Date(d);
+            var workEnd = new Date(d);
             workEnd.setHours(17, 30, 0, 0);
-            const latest = datetimes[datetimes.length - 1];
+            var latest = datetimes[datetimes.length - 1];
             if (latest > workEnd) overtimeSec = (latest - workEnd) / 1000;
           }
 
           details.push({
             date: dateStr,
             weekday: weekdayNames[d.getDay()],
-            times: datetimes.map(t => t.toTimeString().slice(0, 5)).join(", "),
-            durationStr: formatDuration(overtimeSec)
+            times: datetimes.map(function(t) { return t.toTimeString().slice(0, 5); }).join(", "),
+            durationStr: formatDuration(overtimeSec),
+            durationSec: overtimeSec
           });
 
           if (overtimeSec > 0) totalSec += overtimeSec;
         }
 
-        details.sort((a, b) => new Date(a.date) - new Date(b.date));
+        details.sort(function(a,b) { return new Date(a.date) - new Date(b.date); });
 
-        let html = `<h2>${currentYear}年${currentMonth}月 加班明细</h2>`;
+        // Phase 5: Build individual day cards
+        var html = '<div class="section-title">' + currentYear + '年' + currentMonth + '月 加班明细</div>';
+
         if (details.length === 0) {
-          html += `<p>本月暂无打卡记录。</p>`;
+          html += '<div class="empty-state">本月暂无打卡记录</div>';
         } else {
-          for (const day of details) {
-            html += `
-              <p><strong>${day.date} (${day.weekday})</strong><br>
-                 打卡时间: ${day.times}<br>
-                 加班时长: ${day.durationStr}</p>
-              <hr>`;
-          }
-          html += `<span class="total">总加班时长: ${(totalSec / 3600).toFixed(2)} 小时</span>`;
+          details.forEach(function(day, i) {
+            var hasOvertime = day.durationSec > 0;
+            var cls = 'day-card' + (hasOvertime ? ' day-card--overtime' : ' day-card--zero');
+            html +=
+              '<div class="' + cls + '" style="--i:' + i + '">' +
+                '<div class="day-card__header">' +
+                  '<span class="day-card__date">' + day.date + '<span class="day-card__weekday">' + day.weekday + '</span></span>' +
+                  '<span class="day-card__duration">' + day.durationStr + '</span>' +
+                '</div>' +
+                '<div class="day-card__times">打卡时间：' + day.times + '</div>' +
+              '</div>';
+          });
         }
 
-        document.getElementById('result').innerHTML = `<div class="card">${html}</div>`;
+        if (totalSec > 0) {
+          var totalHours = (totalSec / 3600);
+          html +=
+            '<div class="total-card">' +
+              '<span class="total-card__label">总加班时长</span>' +
+              '<span class="total-card__value" id="totalValue" data-target="' + totalHours.toFixed(2) + '">0.00 小时</span>' +
+            '</div>';
+        }
+
+        document.getElementById('result').innerHTML = html;
+
+        // Trigger countUp on total
+        if (totalSec > 0) {
+          var totalEl = document.getElementById('totalValue');
+          if (totalEl) {
+            requestAnimationFrame(function() {
+              animateCountUp(totalEl, parseFloat(totalEl.getAttribute('data-target')), 1200, 2, ' 小时');
+            });
+          }
+        }
+
+        // Update stats
+        var overtimeDays = details.filter(function(d) { return d.durationSec > 0; }).length;
+        updateStats(details.length, totalSec / 3600);
 
       } catch (err) {
         document.getElementById('result').innerHTML =
-          `<div class="card" style="color:#ff3b30;">处理出错：${err.message}</div>`;
+          '<div class="empty-state" style="color:var(--danger);">处理出错：' + err.message + '</div>';
       }
     }
   </script>
