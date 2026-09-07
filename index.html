@@ -456,6 +456,12 @@
       padding:14px 20px calc(24px + var(--safe-bottom));
       transform:translateY(100%);
       transition:transform 0.42s cubic-bezier(0.32,0.72,0,1);
+      touch-action:pan-y;
+    }
+    /* 顶部把手区：唯一的“下拉关闭”手势触发区 */
+    .editor-handle {
+      width:36px; height:5px; background:rgba(255,255,255,0.22); border-radius:100px; margin:0 auto 16px;
+      touch-action:none;
     }
     .editor-overlay.active .editor-panel { transform:translateY(0); }
 
@@ -484,7 +490,9 @@
     }
     td { padding:12px 10px; border-bottom:1px solid rgba(255,255,255,0.05); color:var(--text-secondary); vertical-align:middle; }
     tr:last-child td { border-bottom:none; }
-    tr:hover td { background:rgba(255,255,255,0.025); }
+    @media (hover:hover) and (pointer:fine) {
+      tr:hover td { background:rgba(255,255,255,0.025); }
+    }
     td strong { color:var(--text-primary); font-weight:500; }
 
     .weekday-tag {
@@ -545,7 +553,7 @@
 
       /* Touch target minimums */
       .btn-sm { height:44px; padding:0 20px; }
-      .btn-danger { height:38px; padding:0 18px; }
+      .btn-danger { height:44px; min-width:68px; padding:0 18px; }
       input[type="date"], input[type="time"] { padding:12px 14px; font-size:16px; }
     }
   </style>
@@ -696,6 +704,7 @@
     // ============================================================
     let globalData = {};
     let currentFileName = "overtime_log.json";
+    let editorOpenedAt = 0; // 编辑器打开时间戳，用于 backdrop 防误触
 
     // ============================================================
     // Phase 3: Drop Zone Setup
@@ -728,33 +737,67 @@
     // ============================================================
     // Phase 6: Editor Overlay Setup
     // ============================================================
-    document.getElementById('editorBackdrop').addEventListener('click', closeEditorOverlay);
+    // backdrop 点击关闭（打开动画期间不响应，防误触）
+    document.getElementById('editorBackdrop').addEventListener('click', function() {
+      if (Date.now() - editorOpenedAt < 400) return;
+      closeEditorOverlay();
+    });
 
-    // Swipe-down-to-close gesture
+    // Swipe-down-to-close gesture —— 只在面板顶部把手区生效，避免误触输入框/按钮
     (function setupEditorSwipe() {
+      var overlay = document.getElementById('editorOverlay');
       var panel = document.getElementById('editorPanel');
-      var startY = 0, currentY = 0, isDragging = false;
+      var startY = 0, currentY = 0, dragging = false;
+      var DRAG_START = 12;   // 位移超过该值才判定为“下拉”（而非点击）
+      var DRAG_CLOSE = 140;  // 位移超过该值才关闭编辑器
+      var HANDLE_ZONE = 48;  // 面板顶部把手区高度（px），仅此处可触发下拉关闭
+
+      // 触摸目标位于交互元素上，或不在顶部把手区，则不启用下拉手势
+      function inHandleZone(e) {
+        var t = e.target;
+        if (t && t.closest && t.closest('input, button, a, select, label, textarea, table')) return false;
+        var rect = panel.getBoundingClientRect();
+        return (e.touches[0].clientY - rect.top) <= HANDLE_ZONE;
+      }
 
       panel.addEventListener('touchstart', function(e) {
-        if (panel.scrollTop <= 0) { startY = e.touches[0].clientY; isDragging = true; }
+        if (!overlay.classList.contains('active')) return;
+        if (panel.scrollTop > 0) return;          // 内容已向下滚动时不响应
+        if (!inHandleZone(e)) return;
+        startY = e.touches[0].clientY;
+        dragging = false;
       }, { passive: true });
 
       panel.addEventListener('touchmove', function(e) {
-        if (!isDragging) return;
-        currentY = e.touches[0].clientY;
-        var delta = currentY - startY;
-        if (delta > 0) {
-          panel.style.transform = 'translateY(' + delta + 'px)';
+        if (startY === 0) return;
+        var delta = e.touches[0].clientY - startY;
+        if (delta <= 0) {                         // 向上滑：取消拖动
+          if (dragging) {
+            dragging = false;
+            panel.style.transform = '';
+            panel.style.transition = '';
+          }
+          return;
+        }
+        if (!dragging && delta > DRAG_START) {
+          dragging = true;
           panel.style.transition = 'none';
+        }
+        if (dragging) {
+          currentY = e.touches[0].clientY;
+          panel.style.transform = 'translateY(' + (currentY - startY) * 0.5 + 'px)'; // 带阻尼
         }
       }, { passive: true });
 
       panel.addEventListener('touchend', function() {
-        if (!isDragging) return;
-        isDragging = false;
-        panel.style.transition = '';
-        if (currentY - startY > 100) { closeEditorOverlay(); }
-        else { panel.style.transform = ''; }
+        if (startY === 0) return;
+        if (dragging) {
+          var dy = currentY - startY;
+          panel.style.transition = '';
+          panel.style.transform = '';
+          if (dy > DRAG_CLOSE) closeEditorOverlay();
+        }
+        startY = 0; dragging = false;
       });
     })();
 
@@ -772,6 +815,7 @@
       document.getElementById('newDate').value = now.toISOString().split('T')[0];
       document.getElementById('newTime').value = now.toTimeString().slice(0, 5);
       renderEditorTable();
+      editorOpenedAt = Date.now();
       document.getElementById('editorOverlay').classList.add('active');
       document.body.style.overflow = 'hidden';
     }
