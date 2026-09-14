@@ -70,7 +70,9 @@
 
 ## iOS 快捷指令
 
-可直接导入快捷指令生成的 ISO 时间字符串，无需手动转换为时间戳。导出后需自行将新文件放回快捷指令读取的位置；网页无法直接覆盖 iCloud Drive 中的原文件。
+安装：[打卡快捷指令](https://www.icloud.com/shortcuts/1d4ad7c1eae14dbb964682359b14b8fc)
+
+每次运行会将当前时间以带时区的 ISO 格式追加到 `iCloud Drive/Shortcuts/overtime_log.json`。网页可直接导入该文件；编辑并导出后，需自行用新文件替换原文件。
 
 ## 项目结构
 
