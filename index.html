@@ -768,14 +768,23 @@
       return date;
     }
 
-    function parseEntry(value) {
-      var isNumber = typeof value === 'number' && Number.isFinite(value);
+    function parseEntry(value, dateStr) {
+      var isNumber = typeof value === 'number' && Number.isSafeInteger(value);
       var isISO = typeof value === 'string' &&
         /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/.test(value);
       if (!isNumber && !isISO) throw new Error('打卡时间须为毫秒时间戳或带时区的 ISO 时间字符串');
       if (isISO) parseDateKey(value.slice(0, 10));
+      if (isNumber) {
+        var secondsDate = new Date(value * 1000);
+        if (Number.isFinite(secondsDate.getTime()) && dateStr && localDateKey(secondsDate) === dateStr) {
+          throw new Error('数字时间戳必须使用毫秒，不能使用秒');
+        }
+      }
       var date = new Date(value);
       if (!Number.isFinite(date.getTime())) throw new Error('无效的打卡时间');
+      if (dateStr && localDateKey(date) !== dateStr) {
+        throw new Error('打卡时间日期必须与记录日期一致，不支持跨日打卡');
+      }
       return date;
     }
 
@@ -805,7 +814,7 @@
         }
         var entries = Array.isArray(value.entries) ? value.entries : [value.entries];
         var dates = entries.map(function(entry) {
-          try { return parseEntry(entry); }
+          try { return parseEntry(entry, dateStr); }
           catch (err) { throw new Error(dateStr + '：' + err.message); }
         }).sort(function(a, b) { return a - b; });
         normalized[dateStr] = Object.assign({}, value, { entries: dates.map(formatEntry) });
@@ -929,14 +938,26 @@
       else closeEditorOverlay();
     });
 
+    function editorMonthRange(now) {
+      return {
+        min: localDateKey(new Date(now.getFullYear(), now.getMonth(), 1)),
+        max: localDateKey(new Date(now.getFullYear(), now.getMonth() + 1, 0))
+      };
+    }
+
+    function updateEditorDateRange(now, resetDate) {
+      var input = document.getElementById('newDate');
+      var range = editorMonthRange(now);
+      input.min = range.min;
+      input.max = range.max;
+      if (resetDate || input.value < range.min || input.value > range.max) input.value = localDateKey(now);
+      return range;
+    }
+
     function openEditorOverlay() {
       if (!requireData()) return;
       var now = new Date();
-      var firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-      var lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-      document.getElementById('newDate').min = localDateKey(firstDay);
-      document.getElementById('newDate').max = localDateKey(lastDay);
-      document.getElementById('newDate').value = localDateKey(now);
+      updateEditorDateRange(now, true);
       document.getElementById('newTime').value = now.toTimeString().slice(0, 5);
       renderEditorTable();
       editorOpenedAt = Date.now();
@@ -1113,6 +1134,17 @@
 
     function addEntry() {
       if (!requireData()) return;
+      var now = new Date();
+      var dateInput = document.getElementById('newDate');
+      var currentRange = editorMonthRange(now);
+      if (!dateInput.min || !dateInput.max) {
+        updateEditorDateRange(now, false);
+      } else if (dateInput.min !== currentRange.min || dateInput.max !== currentRange.max) {
+        updateEditorDateRange(now, true);
+        document.getElementById('newTime').value = now.toTimeString().slice(0, 5);
+        alert('当前月份已更新，请确认日期和时间后重新添加');
+        return;
+      }
       var dateVal = document.getElementById('newDate').value;
       var timeVal = document.getElementById('newTime').value;
       if (!dateVal || !timeVal) { alert("请选择完整的日期和时间"); return; }
@@ -1120,7 +1152,6 @@
       var newDate;
       try {
         var selectedDate = parseDateKey(dateVal);
-        var now = new Date();
         if (selectedDate.getFullYear() !== now.getFullYear() || selectedDate.getMonth() !== now.getMonth()) {
           throw new Error('数据编辑器仅支持添加本月打卡');
         }
@@ -1204,7 +1235,7 @@
           var value = globalData[dateStr];
           if (!value || !value.entries || value.entries.length === 0) continue;
           var entries = Array.isArray(value.entries) ? value.entries.slice() : [value.entries];
-          var datetimes = entries.map(function(ts) { return new Date(ts); }).sort(function(a,b) { return a - b; });
+          var datetimes = entries.map(function(ts) { return parseEntry(ts, dateStr); }).sort(function(a,b) { return a - b; });
           var d = parseDateKey(dateStr);
           if (d.getFullYear() !== currentYear || d.getMonth() + 1 !== currentMonth) continue;
 
