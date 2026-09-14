@@ -10,11 +10,13 @@ function app(now = '2026-09-14T00:38:02+08:00') {
   const elements = new Map();
   function element() {
     const classes = new Set();
+    const attributes = new Map();
     return {
       textContent: '', innerHTML: '', value: '', files: [], style: {}, children: [],
       classList: { add: x => classes.add(x), remove: x => classes.delete(x), contains: x => classes.has(x) },
       addEventListener() {}, appendChild(child) { this.children.push(child); }, removeChild() {}, click() {},
-      getAttribute() { return '0'; },
+      setAttribute(name, value) { attributes.set(name, String(value)); },
+      getAttribute(name) { return attributes.get(name) || '0'; },
     };
   }
   function get(id) { if (!elements.has(id)) elements.set(id, element()); return elements.get(id); }
@@ -68,16 +70,45 @@ test('add to iOS scalar record yields sorted strings and refreshes totals', asyn
   assert.equal(a.get('statHours').textContent, '1.5');
 });
 
-test('deleting last record cannot reload original input; empty file permits adding', async () => {
-  const a = app(); await a.load(legacy); a.context.deleteEntry(day); await a.context.processFile();
+test('single-punch chooser deletes only the selected entry and preserves date metadata', async () => {
+  const a = app(); await a.load(legacy); a.context.openEditorOverlay();
+  a.context.openDeletePicker(day);
+  assert.ok(a.get('deleteOverlay').classList.contains('active'));
+  assert.match(a.get('deleteList').innerHTML, /09:00:00/);
+  assert.match(a.get('deleteList').innerHTML, /19:00:00/);
+  a.context.deletePunch(0);
+  assert.equal(a.run(`globalData['${day}'].entries.join(',')`), '2026-09-10T19:00:00+08:00');
+  assert.equal(a.run(`globalData['${day}'].note`), 'preserve me');
+  assert.equal(a.get('statHours').textContent, '1.5');
+});
+
+test('deleting the last punch keeps an empty date object; deleting the day removes it', async () => {
+  const a = app(); await a.load({ [day]: { entries: '2026-09-10T19:00:00+08:00', note: 'keep' } });
+  a.context.openDeletePicker(day); a.context.deletePunch(0);
+  assert.equal(a.run(`globalData['${day}'].entries.length`), 0);
+  assert.equal(a.run(`globalData['${day}'].note`), 'keep');
+  a.context.saveAndDownload();
+  assert.deepEqual(JSON.parse(a.blobs[0])[day], { entries: [], note: 'keep' });
+
+  await a.load(legacy); a.context.openDeletePicker(day); a.context.deleteDay(); await a.context.processFile();
   assert.equal(a.run('Object.keys(globalData).length'), 0);
   assert.equal(a.get('statDays').textContent, '0');
   assert.match(a.get('result').innerHTML, /本月暂无打卡记录/);
-  a.context.saveAndDownload(); assert.deepEqual(JSON.parse(a.blobs[0]), {});
+  a.context.saveAndDownload(); assert.deepEqual(JSON.parse(a.blobs[1]), {});
   await a.load({}); a.context.openEditorOverlay();
   assert.ok(a.get('editorOverlay').classList.contains('active'));
   a.get('newDate').value = day; a.get('newTime').value = '19:00'; a.context.addEntry();
   assert.equal(a.get('statHours').textContent, '1.5');
+});
+
+test('editor prevents adding a date outside the visible current month', async () => {
+  const a = app(); await a.load({}); a.context.openEditorOverlay();
+  assert.equal(a.get('newDate').min, '2026-09-01');
+  assert.equal(a.get('newDate').max, '2026-09-30');
+  a.get('newDate').value = '2026-08-31'; a.get('newTime').value = '19:00';
+  a.context.addEntry();
+  assert.equal(a.run('Object.keys(globalData).length'), 0);
+  assert.match(a.alerts.at(-1), /仅支持添加本月/);
 });
 
 test('weekday/weekend rules and filtering retain expected 3 days / 10.5 hours', async () => {

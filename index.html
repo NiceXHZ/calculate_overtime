@@ -480,6 +480,34 @@
       display:flex; flex-direction:column; gap:10px; margin-top:20px;
     }
 
+    /* Single-punch delete chooser */
+    .delete-overlay {
+      position:fixed; inset:0; z-index:200; display:flex; align-items:flex-end; justify-content:center;
+      pointer-events:none; opacity:0; transition:opacity 0.22s ease;
+    }
+    .delete-overlay.active { pointer-events:auto; opacity:1; }
+    .delete-backdrop { position:absolute; inset:0; background:rgba(0,0,0,0.58); }
+    .delete-panel {
+      position:relative; z-index:1; width:calc(100% - 32px); max-width:480px; margin-bottom:calc(16px + var(--safe-bottom));
+      padding:20px; border:var(--glass-border-strong); border-radius:var(--radius-lg);
+      background:rgba(28,28,38,0.98); box-shadow:var(--shadow-lg);
+      transform:translateY(24px) scale(0.98); transition:transform 0.25s cubic-bezier(0.32,0.72,0,1);
+    }
+    .delete-overlay.active .delete-panel { transform:translateY(0) scale(1); }
+    .delete-title { font-size:18px; font-weight:600; margin-bottom:4px; }
+    .delete-subtitle { font-size:13px; color:var(--text-secondary); margin-bottom:14px; }
+    .delete-list { display:flex; flex-direction:column; gap:8px; max-height:42dvh; overflow-y:auto; }
+    .delete-option {
+      display:flex; align-items:center; justify-content:space-between; gap:12px; width:100%; min-height:50px;
+      padding:9px 10px 9px 14px; border:var(--glass-border); border-radius:var(--radius-sm);
+      background:rgba(255,255,255,0.05); color:var(--text-primary); font:inherit; text-align:left;
+    }
+    .delete-option__label { display:flex; flex-direction:column; }
+    .delete-option__time { font-size:16px; font-weight:600; font-variant-numeric:tabular-nums; }
+    .delete-option__index { font-size:11px; color:var(--text-tertiary); }
+    .delete-option__action { color:var(--danger); font-size:13px; font-weight:600; }
+    .delete-footer { display:flex; flex-direction:column; gap:8px; margin-top:14px; }
+
     /* Table (inside editor) */
     .table-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
 
@@ -698,6 +726,19 @@
     </div>
   </div>
 
+  <div id="deleteOverlay" class="delete-overlay" aria-hidden="true">
+    <div class="delete-backdrop" id="deleteBackdrop"></div>
+    <div class="delete-panel" role="dialog" aria-modal="true" aria-labelledby="deleteTitle">
+      <h3 class="delete-title" id="deleteTitle">选择要删除的打卡</h3>
+      <p class="delete-subtitle" id="deleteSubtitle"></p>
+      <div class="delete-list" id="deleteList"></div>
+      <div class="delete-footer">
+        <button class="btn btn-danger btn-block" onclick="deleteDay()">删除当天全部记录</button>
+        <button class="btn btn-secondary btn-block" onclick="closeDeletePicker()">取消</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     // ============================================================
     // Global state
@@ -708,6 +749,7 @@
     let loadingData = false;
     let loadVersion = 0;
     let editorOpenedAt = 0; // 编辑器打开时间戳，用于 backdrop 防误触
+    let pendingDeleteDate = null;
 
     // Dates are interpreted in the browser's local timezone, as in the editor.
     function localDateKey(date) {
@@ -820,6 +862,7 @@
       if (Date.now() - editorOpenedAt < 400) return;
       closeEditorOverlay();
     });
+    document.getElementById('deleteBackdrop').addEventListener('click', closeDeletePicker);
 
     // Swipe-down-to-close gesture —— 只在面板顶部把手区生效，避免误触输入框/按钮
     (function setupEditorSwipe() {
@@ -881,12 +924,18 @@
 
     // Escape key to close
     document.addEventListener('keydown', function(e) {
-      if (e.key === 'Escape') closeEditorOverlay();
+      if (e.key !== 'Escape') return;
+      if (document.getElementById('deleteOverlay').classList.contains('active')) closeDeletePicker();
+      else closeEditorOverlay();
     });
 
     function openEditorOverlay() {
       if (!requireData()) return;
       var now = new Date();
+      var firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+      var lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      document.getElementById('newDate').min = localDateKey(firstDay);
+      document.getElementById('newDate').max = localDateKey(lastDay);
       document.getElementById('newDate').value = localDateKey(now);
       document.getElementById('newTime').value = now.toTimeString().slice(0, 5);
       renderEditorTable();
@@ -896,6 +945,7 @@
     }
 
     function closeEditorOverlay() {
+      closeDeletePicker();
       document.getElementById('editorOverlay').classList.remove('active');
       document.body.style.overflow = '';
       var panel = document.getElementById('editorPanel');
@@ -1031,9 +1081,34 @@
         tr.innerHTML =
           '<td><strong>' + row.dateStr.slice(5) + '</strong><br><span class="weekday-tag">' + row.weekday + '</span></td>' +
           '<td>' + row.times + '</td>' +
-          '<td><button class="btn btn-danger" onclick="deleteEntry(\'' + row.dateStr + '\')">删除</button></td>';
+          '<td><button class="btn btn-danger" onclick="openDeletePicker(\'' + row.dateStr + '\')">删除</button></td>';
         tbody.appendChild(tr);
       });
+    }
+
+    function openDeletePicker(dateStr) {
+      if (!requireData()) return;
+      var record = globalData[dateStr];
+      if (!record || !Array.isArray(record.entries) || record.entries.length === 0) return;
+      pendingDeleteDate = dateStr;
+      document.getElementById('deleteSubtitle').textContent = dateStr + ' · 请选择一条打卡记录';
+      document.getElementById('deleteList').innerHTML = record.entries.map(function(entry, index) {
+        var time = new Date(entry).toTimeString().slice(0, 8);
+        return '<button class="delete-option" onclick="deletePunch(' + index + ')">' +
+          '<span class="delete-option__label"><span class="delete-option__time">' + time + '</span>' +
+          '<span class="delete-option__index">第 ' + (index + 1) + ' 条</span></span>' +
+          '<span class="delete-option__action">删除</span></button>';
+      }).join('');
+      var overlay = document.getElementById('deleteOverlay');
+      overlay.classList.add('active');
+      overlay.setAttribute('aria-hidden', 'false');
+    }
+
+    function closeDeletePicker() {
+      pendingDeleteDate = null;
+      var overlay = document.getElementById('deleteOverlay');
+      overlay.classList.remove('active');
+      overlay.setAttribute('aria-hidden', 'true');
     }
 
     function addEntry() {
@@ -1044,7 +1119,11 @@
 
       var newDate;
       try {
-        parseDateKey(dateVal);
+        var selectedDate = parseDateKey(dateVal);
+        var now = new Date();
+        if (selectedDate.getFullYear() !== now.getFullYear() || selectedDate.getMonth() !== now.getMonth()) {
+          throw new Error('数据编辑器仅支持添加本月打卡');
+        }
         if (!/^\d{2}:\d{2}$/.test(timeVal)) throw new Error('请输入小时和分钟');
         newDate = new Date(dateVal + 'T' + timeVal + ':00');
         if (!Number.isFinite(newDate.getTime()) || localDateKey(newDate) !== dateVal ||
@@ -1060,13 +1139,31 @@
       processFile();
     }
 
-    function deleteEntry(dateStr) {
+    function deletePunch(index) {
       if (!requireData()) return;
-      if (confirm('确定要删除 ' + dateStr + ' 的所有打卡记录吗？')) {
-        delete globalData[dateStr];
-        renderEditorTable();
-        processFile();
+      var dateStr = pendingDeleteDate;
+      var record = dateStr && globalData[dateStr];
+      if (!record || !Array.isArray(record.entries) || !Number.isInteger(index) || index < 0 || index >= record.entries.length) {
+        closeDeletePicker();
+        return;
       }
+      var time = new Date(record.entries[index]).toTimeString().slice(0, 8);
+      if (!confirm('确定要删除 ' + dateStr + ' ' + time + ' 这条打卡记录吗？')) return;
+      record.entries.splice(index, 1);
+      closeDeletePicker();
+      renderEditorTable();
+      processFile();
+    }
+
+    function deleteDay() {
+      if (!requireData()) return;
+      var dateStr = pendingDeleteDate;
+      if (!dateStr || !globalData[dateStr]) { closeDeletePicker(); return; }
+      if (!confirm('确定要删除 ' + dateStr + ' 的所有打卡记录吗？')) return;
+      delete globalData[dateStr];
+      closeDeletePicker();
+      renderEditorTable();
+      processFile();
     }
 
     function saveAndDownload() {
