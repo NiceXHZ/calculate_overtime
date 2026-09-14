@@ -82,6 +82,9 @@ test('single-punch chooser deletes only the selected entry and preserves date me
   assert.equal(a.run(`globalData['${day}'].entries.join(',')`), '2026-09-10T19:00:00+08:00');
   assert.equal(a.run(`globalData['${day}'].note`), 'preserve me');
   assert.equal(a.get('statHours').textContent, '1.5');
+  assert.ok(a.get('deleteOverlay').classList.contains('active'));
+  assert.doesNotMatch(a.get('deleteList').innerHTML, /09:00:00/);
+  assert.match(a.get('deleteList').innerHTML, /19:00:00/);
 });
 
 test('deleting the last punch keeps an empty date object; deleting the day removes it', async () => {
@@ -89,6 +92,7 @@ test('deleting the last punch keeps an empty date object; deleting the day remov
   a.context.openDeletePicker(day); a.context.deletePunch(0);
   assert.equal(a.run(`globalData['${day}'].entries.length`), 0);
   assert.equal(a.run(`globalData['${day}'].note`), 'keep');
+  assert.equal(a.get('deleteOverlay').classList.contains('active'), false);
   a.context.saveAndDownload();
   assert.deepEqual(JSON.parse(a.blobs[0])[day], { entries: [], note: 'keep' });
 

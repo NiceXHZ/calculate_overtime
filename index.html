@@ -1181,9 +1181,10 @@
       var time = new Date(record.entries[index]).toTimeString().slice(0, 8);
       if (!confirm('确定要删除 ' + dateStr + ' ' + time + ' 这条打卡记录吗？')) return;
       record.entries.splice(index, 1);
-      closeDeletePicker();
       renderEditorTable();
       processFile();
+      if (record.entries.length === 0) closeDeletePicker();
+      else openDeletePicker(dateStr);
     }
 
     function deleteDay() {
