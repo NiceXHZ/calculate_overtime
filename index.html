@@ -704,14 +704,93 @@
     // ============================================================
     let globalData = {};
     let currentFileName = "overtime_log.json";
+    let dataLoaded = false;
+    let loadingData = false;
+    let loadVersion = 0;
     let editorOpenedAt = 0; // 编辑器打开时间戳，用于 backdrop 防误触
+
+    // Dates are interpreted in the browser's local timezone, as in the editor.
+    function localDateKey(date) {
+      return String(date.getFullYear()).padStart(4, '0') + '-' +
+        String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
+    }
+
+    function parseDateKey(value) {
+      if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        throw new Error('日期必须使用 YYYY-MM-DD 格式');
+      }
+      var date = new Date(value + 'T00:00:00');
+      if (!Number.isFinite(date.getTime()) || localDateKey(date) !== value) {
+        throw new Error('无效日期：' + value);
+      }
+      return date;
+    }
+
+    function parseEntry(value) {
+      var isNumber = typeof value === 'number' && Number.isFinite(value);
+      var isISO = typeof value === 'string' &&
+        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/.test(value);
+      if (!isNumber && !isISO) throw new Error('打卡时间须为毫秒时间戳或带时区的 ISO 时间字符串');
+      if (isISO) parseDateKey(value.slice(0, 10));
+      var date = new Date(value);
+      if (!Number.isFinite(date.getTime())) throw new Error('无效的打卡时间');
+      return date;
+    }
+
+    function formatEntry(date) {
+      var offset = -date.getTimezoneOffset();
+      var sign = offset >= 0 ? '+' : '-';
+      var absOffset = Math.abs(offset);
+      var milliseconds = date.getMilliseconds();
+      return localDateKey(date) + 'T' + date.toTimeString().slice(0, 8) +
+        (milliseconds ? '.' + String(milliseconds).padStart(3, '0') : '') + sign +
+        String(Math.floor(absOffset / 60)).padStart(2, '0') + ':' + String(absOffset % 60).padStart(2, '0');
+    }
+
+    // Normalize legacy iOS strings, scalar timestamps and mixed arrays once on import.
+    // Keep unrelated record fields and all months when exporting.
+    function normalizeData(data) {
+      if (!data || typeof data !== 'object' || Array.isArray(data)) {
+        throw new Error('JSON 顶层必须是按日期索引的对象');
+      }
+      var normalized = {};
+      Object.keys(data).sort().forEach(function(dateStr) {
+        parseDateKey(dateStr);
+        var value = data[dateStr];
+        if (!value || typeof value !== 'object' || Array.isArray(value) ||
+            !Object.prototype.hasOwnProperty.call(value, 'entries')) {
+          throw new Error(dateStr + ' 缺少有效的 entries 字段');
+        }
+        var entries = Array.isArray(value.entries) ? value.entries : [value.entries];
+        var dates = entries.map(function(entry) {
+          try { return parseEntry(entry); }
+          catch (err) { throw new Error(dateStr + '：' + err.message); }
+        }).sort(function(a, b) { return a - b; });
+        normalized[dateStr] = Object.assign({}, value, { entries: dates.map(formatEntry) });
+      });
+      return normalized;
+    }
+
+    function requireData() {
+      if (loadingData) { alert('文件正在加载，请稍后再试'); return false; }
+      if (!dataLoaded) { alert('请先选择并加载一个 JSON 文件'); return false; }
+      return true;
+    }
+
+    function resetResults() {
+      document.getElementById('result').innerHTML = '';
+      ['statDays', 'statHours'].forEach(function(id) {
+        var el = document.getElementById(id);
+        cancelAnimationFrame(el.countFrame);
+        el.textContent = '—';
+      });
+    }
 
     // ============================================================
     // Phase 3: Drop Zone Setup
     // ============================================================
     (function setupDropZone() {
       const dropZone = document.getElementById('dropZone');
-      const fileInput = document.getElementById('fileInput');
 
       ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(function(ev) {
         dropZone.addEventListener(ev, function(e) { e.preventDefault(); e.stopPropagation(); });
@@ -728,8 +807,7 @@
       dropZone.addEventListener('drop', function(e) {
         var files = e.dataTransfer.files;
         if (files.length > 0) {
-          fileInput.files = files;
-          handleFileSelect();
+          loadDataToMemory(files[0]);
         }
       });
     })();
@@ -807,12 +885,9 @@
     });
 
     function openEditorOverlay() {
-      if (Object.keys(globalData).length === 0) {
-        alert("请先选择并加载一个 JSON 文件");
-        return;
-      }
+      if (!requireData()) return;
       var now = new Date();
-      document.getElementById('newDate').value = now.toISOString().split('T')[0];
+      document.getElementById('newDate').value = localDateKey(now);
       document.getElementById('newTime').value = now.toTimeString().slice(0, 5);
       renderEditorTable();
       editorOpenedAt = Date.now();
@@ -832,37 +907,48 @@
     // File handling
     // ============================================================
     function handleFileSelect() {
-      var input = document.getElementById('fileInput');
-      var el = document.getElementById('fileName');
-      var dropZone = document.getElementById('dropZone');
-      if (input.files.length > 0) {
-        currentFileName = input.files[0].name;
-        el.textContent = '已选择：' + currentFileName;
-        el.classList.remove('is-empty');
-        dropZone.classList.add('has-file');
-        // Update filename in both drop zone loaded state and file bar
-        document.getElementById('dropZoneLoadedName').textContent = currentFileName;
-        document.getElementById('statFile').textContent = currentFileName;
-        document.getElementById('fileBar').classList.remove('is-empty');
-        loadDataToMemory(input.files[0]);
-      } else {
-        el.textContent = '未选择文件';
-        el.classList.add('is-empty');
-        dropZone.classList.remove('has-file');
-        document.getElementById('statFile').textContent = '未加载文件';
-        document.getElementById('fileBar').classList.add('is-empty');
-      }
+      var file = document.getElementById('fileInput').files[0];
+      // Cancelling the picker leaves the currently loaded data intact.
+      if (file) return loadDataToMemory(file);
     }
 
     async function loadDataToMemory(file) {
+      var version = ++loadVersion;
+      loadingData = true;
+      dataLoaded = false;
+      globalData = {};
+      closeEditorOverlay();
+      resetResults();
+      document.getElementById('fileName').textContent = '正在加载：' + file.name;
+      document.getElementById('fileName').classList.remove('is-empty');
+      document.getElementById('dropZone').classList.remove('has-file');
+      document.getElementById('statFile').textContent = '未加载文件';
+      document.getElementById('fileBar').classList.add('is-empty');
       try {
         var text = await file.text();
-        globalData = JSON.parse(text);
-        document.getElementById('result').innerHTML = "";
-        document.getElementById('statDays').textContent = '—';
-        document.getElementById('statHours').textContent = '—';
+        // A slower earlier selection must never replace a newer file.
+        if (version !== loadVersion) return false;
+        var data = normalizeData(JSON.parse(text.replace(/^\uFEFF/, '')));
+        globalData = data;
+        currentFileName = file.name;
+        dataLoaded = true;
+        document.getElementById('fileName').textContent = '已加载：' + currentFileName;
+        document.getElementById('dropZone').classList.add('has-file');
+        document.getElementById('dropZoneLoadedName').textContent = currentFileName;
+        document.getElementById('statFile').textContent = currentFileName;
+        document.getElementById('fileBar').classList.remove('is-empty');
+        return true;
       } catch (err) {
-        alert("JSON 解析失败，请检查文件格式");
+        if (version !== loadVersion) return false;
+        document.getElementById('fileName').textContent = '加载失败：' + file.name;
+        alert('文件加载失败：' + err.message);
+        return false;
+      } finally {
+        if (version === loadVersion) {
+          loadingData = false;
+          // Allow selecting the same file again after fixing its contents.
+          document.getElementById('fileInput').value = '';
+        }
       }
     }
 
@@ -874,6 +960,7 @@
     }
 
     function animateCountUp(el, target, duration, decimals, suffix) {
+      cancelAnimationFrame(el.countFrame);
       decimals = (decimals === undefined) ? 0 : decimals;
       suffix = suffix || '';
       if (!shouldAnimate()) {
@@ -887,9 +974,9 @@
         var eased = 1 - Math.pow(1 - progress, 3); // easeOutCubic
         var current = eased * target;
         el.textContent = (decimals > 0 ? current.toFixed(decimals) : Math.round(current)) + suffix;
-        if (progress < 1) requestAnimationFrame(update);
+        if (progress < 1) el.countFrame = requestAnimationFrame(update);
       }
-      requestAnimationFrame(update);
+      el.countFrame = requestAnimationFrame(update);
     }
 
     function updateStats(daysCount, totalHours) {
@@ -913,12 +1000,12 @@
       for (var dateStr in globalData) {
         if (!globalData.hasOwnProperty(dateStr)) continue;
         var value = globalData[dateStr];
-        if (!value || !value.entries) continue;
-        var d = new Date(dateStr);
+        if (!value || !value.entries || value.entries.length === 0) continue;
+        var d = parseDateKey(dateStr);
         if (d.getFullYear() !== currentYear || d.getMonth() + 1 !== currentMonth) continue;
 
         var entries = Array.isArray(value.entries) ? value.entries.slice() : [value.entries];
-        entries.sort(function(a,b) { return a - b; });
+        entries.sort(function(a,b) { return new Date(a) - new Date(b); });
 
         var timeStrings = entries.map(function(ts) {
           return new Date(ts).toTimeString().slice(0, 5);
@@ -950,35 +1037,47 @@
     }
 
     function addEntry() {
+      if (!requireData()) return;
       var dateVal = document.getElementById('newDate').value;
       var timeVal = document.getElementById('newTime').value;
       if (!dateVal || !timeVal) { alert("请选择完整的日期和时间"); return; }
 
-      var newTimestamp = new Date(dateVal + 'T' + timeVal + ':00').getTime();
+      var newDate;
+      try {
+        parseDateKey(dateVal);
+        if (!/^\d{2}:\d{2}$/.test(timeVal)) throw new Error('请输入小时和分钟');
+        newDate = new Date(dateVal + 'T' + timeVal + ':00');
+        if (!Number.isFinite(newDate.getTime()) || localDateKey(newDate) !== dateVal ||
+            newDate.toTimeString().slice(0, 5) !== timeVal) throw new Error('无效的打卡时间');
+      } catch (err) { alert(err.message); return; }
 
       if (!globalData[dateVal]) { globalData[dateVal] = { entries: [] }; }
       else if (!Array.isArray(globalData[dateVal].entries)) { globalData[dateVal].entries = [globalData[dateVal].entries]; }
 
-      globalData[dateVal].entries.push(newTimestamp);
-      globalData[dateVal].entries.sort(function(a,b) { return a - b; });
+      globalData[dateVal].entries.push(formatEntry(newDate));
+      globalData[dateVal].entries.sort(function(a,b) { return new Date(a) - new Date(b); });
       renderEditorTable();
+      processFile();
     }
 
     function deleteEntry(dateStr) {
+      if (!requireData()) return;
       if (confirm('确定要删除 ' + dateStr + ' 的所有打卡记录吗？')) {
         delete globalData[dateStr];
         renderEditorTable();
+        processFile();
       }
     }
 
     function saveAndDownload() {
-      var dataStr = JSON.stringify(globalData, null, 2);
+      if (!requireData()) return;
+      var dataStr = JSON.stringify(normalizeData(globalData), null, 2);
       var blob = new Blob([dataStr], { type: "application/json" });
       var url = URL.createObjectURL(blob);
       var a = document.createElement('a');
       a.href = url; a.download = currentFileName;
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
       alert("文件已生成下载，请用新文件替换旧文件。");
     }
 
@@ -993,11 +1092,7 @@
     }
 
     async function processFile() {
-      if (Object.keys(globalData).length === 0) {
-        var file = document.getElementById('fileInput').files[0];
-        if (!file) { alert("请先选择一个 JSON 文件"); return; }
-        await loadDataToMemory(file);
-      }
+      if (!requireData()) return;
 
       var now = new Date();
       var currentYear = now.getFullYear();
@@ -1010,10 +1105,10 @@
         for (var dateStr in globalData) {
           if (!globalData.hasOwnProperty(dateStr)) continue;
           var value = globalData[dateStr];
-          if (!value || !value.entries) continue;
+          if (!value || !value.entries || value.entries.length === 0) continue;
           var entries = Array.isArray(value.entries) ? value.entries.slice() : [value.entries];
           var datetimes = entries.map(function(ts) { return new Date(ts); }).sort(function(a,b) { return a - b; });
-          var d = new Date(dateStr);
+          var d = parseDateKey(dateStr);
           if (d.getFullYear() !== currentYear || d.getMonth() + 1 !== currentMonth) continue;
 
           var isWeekend = d.getDay() === 0 || d.getDay() === 6;
@@ -1083,12 +1178,10 @@
         }
 
         // Update stats
-        var overtimeDays = details.filter(function(d) { return d.durationSec > 0; }).length;
         updateStats(details.length, totalSec / 3600);
 
       } catch (err) {
-        document.getElementById('result').innerHTML =
-          '<div class="empty-state" style="color:var(--danger);">处理出错：' + err.message + '</div>';
+        document.getElementById('result').textContent = '处理出错：' + err.message;
       }
     }
   </script>
