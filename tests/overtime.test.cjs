@@ -6,7 +6,7 @@ const path = require('node:path');
 process.env.TZ = 'Asia/Shanghai';
 const script = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8').match(/<script>([\s\S]*?)<\/script>/)[1];
 
-function app(now = '2026-09-14T00:38:02+08:00') {
+function app(now = '2026-09-14T00:38:02+08:00', options = {}) {
   let currentNow = now;
   const elements = new Map();
   function element() {
@@ -21,25 +21,40 @@ function app(now = '2026-09-14T00:38:02+08:00') {
     };
   }
   function get(id) { if (!elements.has(id)) elements.set(id, element()); return elements.get(id); }
-  const alerts = [], blobs = [], frames = new Map();
+  const alerts = [], blobs = [], frames = new Map(), storage = new Map();
   let nextFrame = 0;
   class Clock extends Date {
     constructor(...args) { super(...(args.length ? args : [currentNow])); }
     static now() { return new Date(currentNow).getTime(); }
   }
+  const year = new Date(currentNow).getFullYear();
+  if (options.seedCalendar !== false) {
+    const calendar = options.cachedCalendar || {
+      year, fetchedAt: Clock.now(), source: 'test', days: options.calendarDays || {}
+    };
+    storage.set('overtime-holidays-v1-' + year, JSON.stringify(calendar));
+  }
   const context = vm.createContext({
-    Date: Clock, console, performance: { now: () => 0 },
+    Date: Clock, console: Object.assign({}, console, { warn: options.logWarnings ? console.warn : () => {} }), performance: { now: () => 0 },
     document: { getElementById: get, body: element(), createElement: element, addEventListener() {} },
     window: { matchMedia: () => ({ matches: true }) },
     alert: msg => alerts.push(msg), confirm: () => true,
     requestAnimationFrame: callback => { frames.set(++nextFrame, callback); return nextFrame; },
     cancelAnimationFrame: id => frames.delete(id),
     setTimeout: callback => callback(),
+    clearTimeout() {},
+    AbortController: globalThis.AbortController,
+    fetch: options.fetch || (() => Promise.reject(new Error('unexpected network request'))),
+    localStorage: {
+      getItem: key => storage.has(key) ? storage.get(key) : null,
+      setItem: (key, value) => storage.set(key, String(value)),
+      removeItem: key => storage.delete(key),
+    },
     Blob: class { constructor(parts) { blobs.push(parts.join('')); } },
     URL: { createObjectURL: () => 'blob:test', revokeObjectURL() {} },
   });
   vm.runInContext(script, context);
-  return { context, get, alerts, blobs, frames,
+  return { context, get, alerts, blobs, frames, storage,
     setNow: value => { currentNow = value; },
     run: source => vm.runInContext(source, context),
     load: data => context.loadDataToMemory({ name: 'test.json', text: async () => JSON.stringify(data) }),
@@ -135,6 +150,163 @@ test('weekday/weekend rules and filtering retain expected 3 days / 10.5 hours', 
   await a.load(sample); await a.context.processFile();
   assert.equal(a.get('statDays').textContent, '3'); assert.equal(a.get('statHours').textContent, '10.5');
   a.context.saveAndDownload(); assert.ok(JSON.parse(a.blobs[0])['2025-12-30']);
+});
+
+test('holiday overrides apply workday rules on Sunday and rest-day rules on Friday', async () => {
+  const a = app(undefined, { calendarDays: {
+    '2026-09-20': { isOffDay: false, name: '国庆节' },
+    '2026-09-25': { isOffDay: true, name: '中秋节<script>' },
+  } });
+  await a.load({
+    '2026-09-20': { entries: ['2026-09-20T09:00:00+08:00', '2026-09-20T19:00:00+08:00'] },
+    '2026-09-25': { entries: ['2026-09-25T09:00:00+08:00', '2026-09-25T19:00:00+08:00'] },
+  });
+  await a.context.processFile();
+  assert.equal(a.get('statHours').textContent, '11.5');
+  assert.match(a.get('result').innerHTML, /day-type-badge--adjusted">调休上班/);
+  assert.match(a.get('result').innerHTML, /day-type-badge--holiday">中秋节&lt;script&gt;/);
+  assert.match(a.get('result').innerHTML, /周日/);
+  assert.match(a.get('result').innerHTML, /周五/);
+  assert.doesNotMatch(a.get('result').innerHTML, /<script>/);
+});
+
+test('day cards visibly distinguish ordinary workdays and weekends', async () => {
+  const a = app();
+  await a.load({
+    '2026-09-10': { entries: '2026-09-10T19:00:00+08:00' },
+    '2026-09-12': { entries: ['2026-09-12T09:00:00+08:00', '2026-09-12T18:00:00+08:00'] },
+  });
+  await a.context.processFile();
+  assert.match(a.get('result').innerHTML, /day-type-badge--workday">工作日/);
+  assert.match(a.get('result').innerHTML, /day-type-badge--weekend">周末/);
+});
+
+test('holiday sources fall through in order, cache success, and retain stale cache on total failure', async () => {
+  const urls = [];
+  const fetch = async url => {
+    urls.push(url);
+    if (urls.length < 3) throw new Error('source unavailable');
+    return { ok: true, status: 200, json: async () => ({ code: 0, holiday: {
+      '09-20': { holiday: false, name: '中秋节前补班', date: '2026-09-20' }
+    } }) };
+  };
+  const a = app(undefined, { seedCalendar: false, fetch });
+  const calendar = await a.context.loadHolidayCalendar(2026);
+  assert.equal(calendar.source, 'Timor');
+  assert.equal(calendar.days['2026-09-20'].isOffDay, false);
+  assert.match(urls[0], /cdn\.jsdelivr\.net/);
+  assert.match(urls[1], /shuyz\.com/);
+  assert.match(urls[2], /timor\.tech/);
+  assert.equal(JSON.parse(a.storage.get('overtime-holidays-v1-2026')).source, 'Timor');
+
+  let attempts = 0;
+  const stale = { year: 2026, fetchedAt: 0, source: 'old', days: {
+    '2026-09-20': { isOffDay: false, name: '调休上班' }
+  } };
+  const b = app(undefined, { cachedCalendar: stale, fetch: async () => { attempts++; throw new Error('offline'); } });
+  const fallback = await b.context.loadHolidayCalendar(2026);
+  assert.equal(attempts, 3);
+  assert.equal(fallback.source, 'old');
+  assert.equal(fallback.days['2026-09-20'].isOffDay, false);
+  assert.equal((await b.context.loadHolidayCalendar(2026)).source, 'old');
+  assert.equal(attempts, 3);
+});
+
+test('all holiday data formats normalize to the same date override shape', () => {
+  const a = app();
+  const first = a.context.parseHolidayCn({ year: 2026, days: [
+    { date: '2026-09-20', isOffDay: false, name: '国庆节' }
+  ] }, 2026);
+  const second = a.context.parseShuyzCalendar({ Years: { '2026': [
+    { Name: '中秋节', StartDate: '2026-09-25', EndDate: '2026-09-27', CompDays: ['2026-09-20'] }
+  ] } }, 2026);
+  assert.equal(first['2026-09-20'].isOffDay, false);
+  assert.equal(second['2026-09-20'].isOffDay, false);
+  assert.equal(second['2026-09-25'].isOffDay, true);
+});
+
+test('compensation workdays override every holiday range regardless of source order', () => {
+  const a = app();
+  const days = a.context.parseShuyzCalendar({ Years: { '2026': [
+    { Name: '先声明的补班', StartDate: '2026-09-01', EndDate: '2026-09-01', CompDays: ['2026-09-20'] },
+    { Name: '后出现的假期区间', StartDate: '2026-09-20', EndDate: '2026-09-21', CompDays: [] },
+  ] } }, 2026);
+  assert.equal(days['2026-09-20'].isOffDay, false);
+});
+
+test('empty or out-of-month data calculates immediately without holiday requests or warnings', async () => {
+  let attempts = 0;
+  const a = app(undefined, { seedCalendar: false, fetch: async () => { attempts++; throw new Error('offline'); } });
+  await a.load({ '2026-08-31': { entries: '2026-08-31T19:00:00+08:00' } });
+  await a.context.processFile();
+  assert.equal(attempts, 0);
+  assert.equal(a.get('statDays').textContent, '0');
+  assert.match(a.get('result').innerHTML, /本月暂无打卡记录/);
+  assert.doesNotMatch(a.get('result').innerHTML, /调休数据暂不可用/);
+});
+
+test('December holiday-cn refresh merges corrections published in the following year file', async () => {
+  const urls = [];
+  const a = app('2026-12-15T12:00:00+08:00', { seedCalendar: false, fetch: async url => {
+    urls.push(url);
+    if (/2026\.json$/.test(url)) return { ok: true, status: 200, json: async () => ({ year: 2026, days: [
+      { date: '2026-12-25', isOffDay: false, name: '普通工作日' }
+    ] }) };
+    return { ok: true, status: 200, json: async () => ({ year: 2027, days: [
+      { date: '2026-12-31', isOffDay: true, name: '元旦调整' },
+      { date: '2027-01-01', isOffDay: true, name: '元旦' }
+    ] }) };
+  } });
+  const calendar = await a.context.loadHolidayCalendar(2026);
+  assert.equal(urls.length, 2);
+  assert.match(urls[1], /2027\.json$/);
+  assert.equal(calendar.days['2026-12-31'].isOffDay, true);
+  assert.equal(calendar.days['2027-01-01'], undefined);
+  assert.equal(calendar.followingYearChecked, true);
+});
+
+test('holiday loading disables recalculation and hides stale totals until complete', async () => {
+  let resolveFetch;
+  const response = new Promise(resolve => { resolveFetch = resolve; });
+  const a = app(undefined, { seedCalendar: false, fetch: () => response });
+  await a.load({ [day]: { entries: '2026-09-10T19:00:00+08:00' } });
+  const processing = a.context.processFile();
+  assert.equal(a.get('calculateButton').disabled, true);
+  assert.equal(a.get('statHours').textContent, '…');
+  assert.match(a.get('result').innerHTML, /正在加载调休数据/);
+  resolveFetch({ ok: true, status: 200, json: async () => ({ year: 2026, days: [
+    { date: '2026-09-10', isOffDay: false, name: '工作日' }
+  ] }) });
+  await processing;
+  assert.equal(a.get('calculateButton').disabled, false);
+  assert.equal(a.get('statHours').textContent, '1.5');
+});
+
+test('a newer empty calculation supersedes pending holiday loading without leaving the button disabled', async () => {
+  let resolveFetch;
+  const response = new Promise(resolve => { resolveFetch = resolve; });
+  const a = app(undefined, { seedCalendar: false, fetch: () => response });
+  await a.load({ [day]: { entries: '2026-09-10T19:00:00+08:00' } });
+  const oldCalculation = a.context.processFile();
+  assert.equal(a.get('calculateButton').disabled, true);
+  a.run(`globalData['${day}'].entries = []`);
+  await a.context.processFile();
+  assert.equal(a.get('calculateButton').disabled, false);
+  assert.match(a.get('result').innerHTML, /本月暂无打卡记录/);
+  resolveFetch({ ok: true, status: 200, json: async () => ({ year: 2026, days: [
+    { date: '2026-09-10', isOffDay: false, name: '工作日' }
+  ] }) });
+  await oldCalculation;
+  assert.equal(a.get('calculateButton').disabled, false);
+  assert.match(a.get('result').innerHTML, /本月暂无打卡记录/);
+});
+
+test('shows a clear warning when no holiday source or cache is available', async () => {
+  const a = app(undefined, { seedCalendar: false, fetch: async () => { throw new Error('offline'); } });
+  await a.load({ [day]: { entries: '2026-09-10T19:00:00+08:00' } });
+  await a.context.processFile();
+  assert.equal(a.get('statHours').textContent, '1.5');
+  assert.match(a.get('result').innerHTML, /调休数据暂不可用/);
 });
 
 test('single weekend punch and empty entry array do not add overtime', async () => {

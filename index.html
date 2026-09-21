@@ -407,8 +407,27 @@
     .day-card__header {
       display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:4px;
     }
+    .day-card__identity { display:flex; align-items:center; flex-wrap:wrap; gap:6px; min-width:0; }
     .day-card__date { font-weight:600; font-size:15px; color:var(--text-primary); }
-    .day-card__weekday { font-size:12px; font-weight:400; color:var(--text-tertiary); margin-left:6px; }
+    .day-card__weekday { font-size:12px; font-weight:400; color:var(--text-tertiary); }
+    .day-type-badge {
+      display:inline-flex; align-items:center; min-height:20px; padding:2px 8px;
+      border:1px solid transparent; border-radius:100px;
+      font-size:10px; font-weight:600; line-height:1.35; letter-spacing:0.02em;
+      max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    }
+    .day-type-badge--workday {
+      color:rgba(152,205,255,0.95); background:rgba(64,156,255,0.11); border-color:rgba(64,156,255,0.20);
+    }
+    .day-type-badge--weekend {
+      color:rgba(205,172,255,0.95); background:rgba(175,82,222,0.12); border-color:rgba(191,111,255,0.22);
+    }
+    .day-type-badge--holiday {
+      color:rgba(255,158,151,0.98); background:rgba(255,69,58,0.11); border-color:rgba(255,105,97,0.22);
+    }
+    .day-type-badge--adjusted {
+      color:rgba(255,211,140,0.98); background:rgba(255,159,10,0.12); border-color:rgba(255,179,64,0.24);
+    }
     .day-card__duration { font-weight:700; font-size:16px; color:var(--accent); white-space:nowrap; }
     .day-card--zero .day-card__duration { color:var(--text-muted); font-weight:500; }
     .day-card__times { font-size:13px; color:var(--text-tertiary); }
@@ -428,6 +447,11 @@
 
     /* Empty / Error */
     .empty-state { text-align:center; padding:28px 16px; color:var(--text-muted); font-size:15px; }
+    .calendar-warning {
+      margin:0 0 10px; padding:10px 12px; border-radius:var(--radius-sm);
+      border:1px solid rgba(255,159,10,0.25); background:rgba(255,159,10,0.08);
+      color:rgba(255,214,153,0.92); font-size:12px; line-height:1.5;
+    }
 
     /* ============================================================
        Phase 6: Editor Overlay (Bottom Sheet)
@@ -650,7 +674,7 @@
 
     <!-- Action Buttons (above stats, won't jump) -->
     <div class="btn-row">
-      <button class="btn btn-primary" onclick="processFile()">
+      <button class="btn btn-primary" id="calculateButton" onclick="processFile()">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
         </svg>
@@ -748,8 +772,15 @@
     let dataLoaded = false;
     let loadingData = false;
     let loadVersion = 0;
+    let calculationRunVersion = 0;
     let editorOpenedAt = 0; // 编辑器打开时间戳，用于 backdrop 防误触
     let pendingDeleteDate = null;
+    const HOLIDAY_CACHE_PREFIX = 'overtime-holidays-v1-';
+    const HOLIDAY_CACHE_TTL = 7 * 24 * 60 * 60 * 1000;
+    const HOLIDAY_RETRY_DELAY = 5 * 60 * 1000;
+    const holidayMemoryCache = {};
+    const holidayRequests = {};
+    const holidayRetryAfter = {};
 
     // Dates are interpreted in the browser's local timezone, as in the editor.
     function localDateKey(date) {
@@ -822,6 +853,206 @@
       return normalized;
     }
 
+    function addHolidayDay(days, dateStr, isOffDay, name) {
+      parseDateKey(dateStr);
+      days[dateStr] = { isOffDay: isOffDay, name: name || (isOffDay ? '节假日' : '调休上班') };
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, function(char) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char];
+      });
+    }
+
+    function parseHolidayCn(data, year) {
+      if (!data || data.year !== year || !Array.isArray(data.days) || data.days.length === 0) {
+        throw new Error('holiday-cn 数据格式无效');
+      }
+      var days = {};
+      data.days.forEach(function(day) {
+        if (!day || typeof day.isOffDay !== 'boolean') throw new Error('holiday-cn 日期数据无效');
+        addHolidayDay(days, day.date, day.isOffDay, day.name);
+      });
+      return days;
+    }
+
+    function parseShuyzCalendar(data, year) {
+      var holidays = data && data.Years && data.Years[String(year)];
+      if (!Array.isArray(holidays) || holidays.length === 0) throw new Error('china-holiday-calender 数据格式无效');
+      var days = {};
+      holidays.forEach(function(holiday) {
+        var current = parseDateKey(holiday.StartDate);
+        var end = parseDateKey(holiday.EndDate);
+        if (current > end) throw new Error('china-holiday-calender 日期范围无效');
+        while (current <= end) {
+          addHolidayDay(days, localDateKey(current), true, holiday.Name);
+          current.setDate(current.getDate() + 1);
+        }
+      });
+      // Apply compensation days last so they always override an overlapping holiday range.
+      holidays.forEach(function(holiday) {
+        (holiday.CompDays || []).forEach(function(dateStr) {
+          addHolidayDay(days, dateStr, false, '调休上班');
+        });
+      });
+      return days;
+    }
+
+    function parseTimorCalendar(data) {
+      if (!data || data.code !== 0 || !data.holiday || typeof data.holiday !== 'object') {
+        throw new Error('Timor 节假日数据格式无效');
+      }
+      var keys = Object.keys(data.holiday);
+      if (keys.length === 0) throw new Error('Timor 节假日数据为空');
+      var days = {};
+      keys.forEach(function(key) {
+        var day = data.holiday[key];
+        if (!day || typeof day.holiday !== 'boolean') throw new Error('Timor 日期数据无效');
+        addHolidayDay(days, day.date, day.holiday, day.name);
+      });
+      return days;
+    }
+
+    function fetchHolidayJson(url) {
+      var controller = (typeof AbortController === 'function') ? new AbortController() : null;
+      var timer = setTimeout(function() { if (controller) controller.abort(); }, 5000);
+      return fetch(url, controller ? { signal: controller.signal } : {}).then(function(response) {
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        return response.json();
+      }).finally(function() { clearTimeout(timer); });
+    }
+
+    function readHolidayCache(year) {
+      try {
+        var raw = localStorage.getItem(HOLIDAY_CACHE_PREFIX + year);
+        if (!raw) return null;
+        var cached = JSON.parse(raw);
+        if (!cached || cached.year !== year || !Number.isFinite(cached.fetchedAt) ||
+            !cached.days || typeof cached.days !== 'object') return null;
+        Object.keys(cached.days).forEach(function(dateStr) {
+          parseDateKey(dateStr);
+          if (typeof cached.days[dateStr].isOffDay !== 'boolean') throw new Error('缓存日期无效');
+        });
+        return cached;
+      } catch (err) {
+        try { localStorage.removeItem(HOLIDAY_CACHE_PREFIX + year); } catch (_) {}
+        return null;
+      }
+    }
+
+    function writeHolidayCache(calendar) {
+      try { localStorage.setItem(HOLIDAY_CACHE_PREFIX + calendar.year, JSON.stringify(calendar)); }
+      catch (err) { console.warn('无法保存节假日缓存：', err); }
+    }
+
+    async function refreshHolidayCalendar(year, staleCache) {
+      var sources = [
+        {
+          name: 'holiday-cn',
+          load: async function() {
+            var days = parseHolidayCn(await fetchHolidayJson(
+              'https://cdn.jsdelivr.net/gh/NateScarlet/holiday-cn@master/' + year + '.json'
+            ), year);
+            var followingYearChecked = false;
+            var now = new Date();
+            // The following year's notice can contain corrections for late December.
+            if (now.getFullYear() === year && now.getMonth() === 11) {
+              followingYearChecked = true;
+              var followingDays = parseHolidayCn(await fetchHolidayJson(
+                'https://cdn.jsdelivr.net/gh/NateScarlet/holiday-cn@master/' + (year + 1) + '.json'
+              ), year + 1);
+              Object.keys(followingDays).forEach(function(dateStr) {
+                if (dateStr.indexOf(year + '-') === 0) days[dateStr] = followingDays[dateStr];
+              });
+            }
+            return { days: days, followingYearChecked: followingYearChecked };
+          }
+        },
+        {
+          name: 'china-holiday-calender',
+          load: async function() {
+            return { days: parseShuyzCalendar(await fetchHolidayJson(
+              'https://www.shuyz.com/githubfiles/china-holiday-calender/master/holidayAPI.json'
+            ), year) };
+          }
+        },
+        {
+          name: 'Timor',
+          load: async function() {
+            return { days: parseTimorCalendar(await fetchHolidayJson(
+              'https://timor.tech/api/holiday/year/' + year
+            )) };
+          }
+        }
+      ];
+
+      for (var i = 0; i < sources.length; i++) {
+        try {
+          var source = sources[i];
+          var loaded = await source.load();
+          var calendar = {
+            year: year,
+            fetchedAt: Date.now(),
+            source: source.name,
+            days: loaded.days,
+            followingYearChecked: loaded.followingYearChecked === true
+          };
+          delete holidayRetryAfter[year];
+          writeHolidayCache(calendar);
+          return calendar;
+        } catch (err) {
+          console.warn('节假日数据源不可用：' + sources[i].name, err);
+        }
+      }
+      holidayRetryAfter[year] = Date.now() + HOLIDAY_RETRY_DELAY;
+      return staleCache;
+    }
+
+    function loadHolidayCalendar(year) {
+      var cached = holidayMemoryCache[year] || readHolidayCache(year);
+      var now = new Date();
+      var needsDecemberRefresh = cached && cached.source === 'holiday-cn' &&
+        now.getFullYear() === year && now.getMonth() === 11 && cached.followingYearChecked !== true;
+      if (cached && !needsDecemberRefresh && Date.now() - cached.fetchedAt < HOLIDAY_CACHE_TTL) {
+        holidayMemoryCache[year] = cached;
+        return cached;
+      }
+      if (holidayRetryAfter[year] && Date.now() < holidayRetryAfter[year]) return cached;
+      if (!holidayRequests[year]) {
+        holidayRequests[year] = refreshHolidayCalendar(year, cached).then(function(calendar) {
+          if (calendar) holidayMemoryCache[year] = calendar;
+          return calendar;
+        }).catch(function(err) {
+          console.warn('节假日数据加载失败：', err);
+          return cached;
+        }).finally(function() {
+          delete holidayRequests[year];
+        });
+      }
+      return holidayRequests[year];
+    }
+
+    function hasCurrentMonthEntries(year, month) {
+      for (var dateStr in globalData) {
+        if (!Object.prototype.hasOwnProperty.call(globalData, dateStr)) continue;
+        var record = globalData[dateStr];
+        if (!record || !Array.isArray(record.entries) || record.entries.length === 0) continue;
+        var date = parseDateKey(dateStr);
+        if (date.getFullYear() === year && date.getMonth() + 1 === month) return true;
+      }
+      return false;
+    }
+
+    function setCalculationLoading(isLoading) {
+      document.getElementById('calculateButton').disabled = isLoading;
+      if (!isLoading) return;
+      ['statDays', 'statHours'].forEach(function(id) {
+        var el = document.getElementById(id);
+        cancelAnimationFrame(el.countFrame);
+        el.textContent = '…';
+      });
+    }
+
     function requireData() {
       if (loadingData) { alert('文件正在加载，请稍后再试'); return false; }
       if (!dataLoaded) { alert('请先选择并加载一个 JSON 文件'); return false; }
@@ -829,6 +1060,8 @@
     }
 
     function resetResults() {
+      calculationRunVersion++;
+      setCalculationLoading(false);
       document.getElementById('result').innerHTML = '';
       ['statDays', 'statHours'].forEach(function(id) {
         var el = document.getElementById(id);
@@ -1223,12 +1456,32 @@
     async function processFile() {
       if (!requireData()) return;
 
+      var runVersion = ++calculationRunVersion;
+      var fileVersion = loadVersion;
+      // A newer calculation supersedes any older pending holiday request.
+      setCalculationLoading(false);
       var now = new Date();
       var currentYear = now.getFullYear();
       var currentMonth = now.getMonth() + 1;
       var weekdayNames = ["周日","周一","周二","周三","周四","周五","周六"];
       var totalSec = 0;
       var details = [];
+
+      var needsHolidayData = hasCurrentMonthEntries(currentYear, currentMonth);
+      var holidayCalendar = null;
+      if (needsHolidayData) {
+        holidayCalendar = loadHolidayCalendar(currentYear);
+        if (holidayCalendar && typeof holidayCalendar.then === 'function') {
+          setCalculationLoading(true);
+          document.getElementById('result').innerHTML = '<div class="empty-state">正在加载调休数据…</div>';
+          try {
+            holidayCalendar = await holidayCalendar;
+          } finally {
+            if (runVersion === calculationRunVersion) setCalculationLoading(false);
+          }
+          if (runVersion !== calculationRunVersion || fileVersion !== loadVersion || !dataLoaded) return;
+        }
+      }
 
       try {
         for (var dateStr in globalData) {
@@ -1240,12 +1493,23 @@
           var d = parseDateKey(dateStr);
           if (d.getFullYear() !== currentYear || d.getMonth() + 1 !== currentMonth) continue;
 
+          var holidayOverride = holidayCalendar && holidayCalendar.days[dateStr];
           var isWeekend = d.getDay() === 0 || d.getDay() === 6;
+          var isRestDay = holidayOverride ? holidayOverride.isOffDay : isWeekend;
+          var dayType = 'workday';
+          var dayTypeLabel = '工作日';
+          if (holidayOverride) {
+            dayType = holidayOverride.isOffDay ? 'holiday' : 'adjusted';
+            dayTypeLabel = holidayOverride.isOffDay ? holidayOverride.name : '调休上班';
+          } else if (isWeekend) {
+            dayType = 'weekend';
+            dayTypeLabel = '周末';
+          }
           var overtimeSec = 0;
 
-          if (isWeekend && datetimes.length >= 2) {
+          if (isRestDay && datetimes.length >= 2) {
             overtimeSec = (datetimes[datetimes.length - 1] - datetimes[0]) / 1000;
-          } else if (!isWeekend) {
+          } else if (!isRestDay) {
             var workEnd = new Date(d);
             workEnd.setHours(17, 30, 0, 0);
             var latest = datetimes[datetimes.length - 1];
@@ -1255,6 +1519,8 @@
           details.push({
             date: dateStr,
             weekday: weekdayNames[d.getDay()],
+            dayType: dayType,
+            dayTypeLabel: dayTypeLabel,
             times: datetimes.map(function(t) { return t.toTimeString().slice(0, 5); }).join(", "),
             durationStr: formatDuration(overtimeSec),
             durationSec: overtimeSec
@@ -1267,6 +1533,9 @@
 
         // Phase 5: Build individual day cards
         var html = '<div class="section-title">' + currentYear + '年' + currentMonth + '月 加班明细</div>';
+        if (needsHolidayData && !holidayCalendar) {
+          html += '<div class="calendar-warning">调休数据暂不可用，当前结果仅按星期计算。</div>';
+        }
 
         if (details.length === 0) {
           html += '<div class="empty-state">本月暂无打卡记录</div>';
@@ -1277,7 +1546,11 @@
             html +=
               '<div class="' + cls + '" style="--i:' + i + '">' +
                 '<div class="day-card__header">' +
-                  '<span class="day-card__date">' + day.date + '<span class="day-card__weekday">' + day.weekday + '</span></span>' +
+                  '<span class="day-card__identity">' +
+                    '<span class="day-card__date">' + day.date + '</span>' +
+                    '<span class="day-card__weekday">' + escapeHtml(day.weekday) + '</span>' +
+                    '<span class="day-type-badge day-type-badge--' + day.dayType + '">' + escapeHtml(day.dayTypeLabel) + '</span>' +
+                  '</span>' +
                   '<span class="day-card__duration">' + day.durationStr + '</span>' +
                 '</div>' +
                 '<div class="day-card__times">打卡时间：' + day.times + '</div>' +
