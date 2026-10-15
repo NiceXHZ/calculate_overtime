@@ -1,1603 +1,732 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <title>加班统计工具</title>
-  <link rel="icon" type="image/png" sizes="180x180" href="./icon.png" />
-  <link rel="apple-touch-icon" sizes="180x180" href="./icon.png" />
-
-  <style>
-    /* ============================================================
-       CSS Custom Properties — Apple Liquid Glass Design System
-       ============================================================ */
-    :root {
-      /* Glass surfaces */
-      --glass-bg-card: rgba(255, 255, 255, 0.07);
-      --glass-bg-elevated: rgba(255, 255, 255, 0.12);
-      --glass-bg-button: rgba(255, 255, 255, 0.10);
-      --glass-bg-button-hover: rgba(255, 255, 255, 0.18);
-      --glass-bg-button-active: rgba(255, 255, 255, 0.04);
-      --glass-bg-input: rgba(0, 0, 0, 0.30);
-      --glass-bg-overlay: rgba(20, 20, 30, 0.94);
-
-      /* Glass borders */
-      --glass-border: 1px solid rgba(255, 255, 255, 0.10);
-      --glass-border-strong: 1px solid rgba(255, 255, 255, 0.20);
-      --glass-border-accent: 1px solid rgba(10, 132, 255, 0.35);
-
-      /* Blur & filter */
-      --blur-card: 40px;
-      --blur-button: 20px;
-      --saturate: 180%;
-
-      /* Radii */
-      --radius-xl: 28px;
-      --radius-lg: 22px;
-      --radius-md: 16px;
-      --radius-sm: 12px;
-      --radius-xs: 8px;
-
-      /* Typography */
-      --text-primary: #ffffff;
-      --text-secondary: rgba(255, 255, 255, 0.78);
-      --text-tertiary: rgba(255, 255, 255, 0.50);
-      --text-muted: rgba(255, 255, 255, 0.30);
-
-      /* Accent */
-      --accent: #0A84FF;
-      --accent-glow: rgba(10, 132, 255, 0.40);
-      --accent-soft: rgba(10, 132, 255, 0.12);
-      --accent-hover: #409CFF;
-      --success: #30D158;
-      --danger: #FF453A;
-      --danger-hover: #FF6961;
-
-      /* Shadows */
-      --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
-      --shadow-md: 0 4px 20px rgba(0, 0, 0, 0.30);
-      --shadow-lg: 0 8px 40px rgba(0, 0, 0, 0.40);
-      --shadow-glow: 0 0 30px var(--accent-glow);
-
-      /* Spacing */
-      --safe-bottom: env(safe-area-inset-bottom, 16px);
-    }
-
-    /* ============================================================
-       Reset & Base
-       ============================================================ */
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    html {
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", "Helvetica Neue", sans-serif;
-      min-height: 100dvh;
-      color: var(--text-primary);
-      line-height: 1.5;
-      background: #0a0a0f;
-      overflow-x: hidden;
-      overscroll-behavior: none;
-    }
-
-    /* ============================================================
-       Phase 1: Background — Orbs + Bokeh Particles
-       ============================================================ */
-    .bg-scene {
-      position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none;
-    }
-
-    .bg-orb {
-      position: absolute; border-radius: 50%; filter: blur(120px); opacity: 0.55; will-change: transform;
-    }
-    .bg-orb--1 { width:520px; height:520px; background:radial-gradient(circle at 30% 30%, #3b82f6, #1e3a8a); top:-10%; left:-8%; animation:orbFloat1 18s ease-in-out infinite; }
-    .bg-orb--2 { width:440px; height:440px; background:radial-gradient(circle at 60% 40%, #8b5cf6, #4c1d95); top:35%; right:-12%; animation:orbFloat2 22s ease-in-out infinite; }
-    .bg-orb--3 { width:360px; height:360px; background:radial-gradient(circle at 50% 50%, #06b6d4, #164e63); bottom:-12%; left:15%; animation:orbFloat3 20s ease-in-out infinite; }
-    .bg-orb--4 { width:280px; height:280px; background:radial-gradient(circle at 40% 40%, rgba(10,132,255,0.7), rgba(10,132,255,0.1)); top:55%; left:50%; animation:orbFloat4 24s ease-in-out infinite; }
-
-    @keyframes orbFloat1 {
-      0%,100%{transform:translate(0,0) scale(1)} 25%{transform:translate(60px,40px) scale(1.12)} 50%{transform:translate(-20px,80px) scale(0.94)} 75%{transform:translate(-50px,-20px) scale(1.06)}
-    }
-    @keyframes orbFloat2 {
-      0%,100%{transform:translate(0,0) scale(1)} 25%{transform:translate(-70px,-30px) scale(1.08)} 50%{transform:translate(30px,-60px) scale(0.92)} 75%{transform:translate(50px,40px) scale(1.10)}
-    }
-    @keyframes orbFloat3 {
-      0%,100%{transform:translate(0,0) scale(1)} 33%{transform:translate(50px,-50px) scale(1.10)} 66%{transform:translate(-40px,30px) scale(0.95)}
-    }
-    @keyframes orbFloat4 {
-      0%,100%{transform:translate(0,0) scale(1)} 25%{transform:translate(-30px,-60px) scale(1.15)} 50%{transform:translate(40px,-20px) scale(0.88)} 75%{transform:translate(-50px,30px) scale(1.05)}
-    }
-
-    /* Noise texture */
-    .bg-noise {
-      position:fixed; inset:0; z-index:1; pointer-events:none; opacity:0.025;
-      background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
-      background-size:200px 200px;
-    }
-
-    /* Phase 1: Floating bokeh particles */
-    .particle-field {
-      position:fixed; inset:0; z-index:2; pointer-events:none; overflow:hidden;
-    }
-    .particle {
-      position:absolute; border-radius:50%; background:rgba(255,255,255,0.12); opacity:0; animation:bokehFloat linear infinite;
-    }
-    .p1 { width:6px; height:6px; left:8%;  animation-duration:14s; animation-delay:0s; }
-    .p2 { width:4px; height:4px; left:20%; animation-duration:18s; animation-delay:2s; }
-    .p3 { width:8px; height:8px; left:33%; animation-duration:16s; animation-delay:5s; }
-    .p4 { width:3px; height:3px; left:46%; animation-duration:20s; animation-delay:1s; }
-    .p5 { width:5px; height:5px; left:58%; animation-duration:15s; animation-delay:7s; }
-    .p6 { width:7px; height:7px; left:70%; animation-duration:22s; animation-delay:3s; }
-    .p7 { width:4px; height:4px; left:82%; animation-duration:17s; animation-delay:6s; }
-    .p8 { width:6px; height:6px; left:5%;  animation-duration:19s; animation-delay:9s; }
-    .p9 { width:3px; height:3px; left:26%; animation-duration:21s; animation-delay:4s; }
-    .p10{ width:5px; height:5px; left:54%; animation-duration:13s; animation-delay:8s; }
-    .p11{ width:4px; height:4px; left:66%; animation-duration:23s; animation-delay:2s; }
-    .p12{ width:3px; height:3px; left:90%; animation-duration:15s; animation-delay:11s; }
-
-    @keyframes bokehFloat {
-      0%   { opacity:0;    transform:translateY(105vh) translateX(0) scale(0); }
-      8%   { opacity:0.45; }
-      30%  { opacity:0.25; transform:translateY(65vh) translateX(18px) scale(1); }
-      60%  { opacity:0.10; transform:translateY(30vh) translateX(-12px) scale(0.7); }
-      92%  { opacity:0.03; }
-      100% { opacity:0;    transform:translateY(-5vh) translateX(0) scale(0.15); }
-    }
-
-    /* ============================================================
-       Phase 2: Hero Section
-       ============================================================ */
-    .hero {
-      position:relative; z-index:10; text-align:center; padding:50px 20px 8px;
-    }
-
-    .hero-orb {
-      width:120px; height:120px; margin:0 auto 24px; border-radius:50%;
-      background:
-        radial-gradient(circle at 35% 35%, rgba(255,255,255,0.25) 0%, rgba(10,132,255,0.12) 35%, rgba(10,132,255,0.03) 65%, transparent 100%);
-      box-shadow:
-        0 0 60px rgba(10,132,255,0.25),
-        0 0 120px rgba(10,132,255,0.10),
-        inset 0 0 30px rgba(255,255,255,0.06);
-      backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
-      border:1px solid rgba(255,255,255,0.08);
-      animation:heroOrbPulse 5s ease-in-out infinite;
-      display:flex; align-items:center; justify-content:center;
-    }
-
-    /* Inner clock icon inside orb */
-    .hero-orb__icon {
-      width:44px; height:44px; color:rgba(255,255,255,0.7);
-    }
-
-    @keyframes heroOrbPulse {
-      0%,100% {
-        transform:scale(1);
-        box-shadow:0 0 60px rgba(10,132,255,0.25),0 0 120px rgba(10,132,255,0.10),inset 0 0 30px rgba(255,255,255,0.06);
-      }
-      50% {
-        transform:scale(1.06);
-        box-shadow:0 0 80px rgba(10,132,255,0.38),0 0 160px rgba(10,132,255,0.18),inset 0 0 45px rgba(255,255,255,0.12);
-      }
-    }
-
-    .hero-title {
-      font-size:28px; font-weight:600; letter-spacing:-0.02em; color:var(--text-primary); margin:0 0 6px;
-    }
-    .hero-subtitle {
-      font-size:14px; color:var(--text-secondary); margin:0 0 8px;
-    }
-    .hero-subtitle code {
-      background:rgba(255,255,255,0.08); padding:3px 8px; border-radius:6px; font-size:13px; font-weight:500; border:1px solid rgba(255,255,255,0.06);
-    }
-
-    /* ============================================================
-       Main Container
-       ============================================================ */
-    .container {
-      position:relative; z-index:10; max-width:560px; margin:0 auto; padding:8px 20px calc(32px + var(--safe-bottom));
-    }
-
-    /* ============================================================
-       Phase 3: Drop Zone
-       ============================================================ */
-    .drop-zone {
-      position:relative;
-      border:2px dashed rgba(255,255,255,0.12);
-      border-radius:var(--radius-lg);
-      padding:34px 24px; text-align:center; cursor:pointer;
-      background:rgba(255,255,255,0.02);
-      transition:border-color 0.3s ease, background 0.3s ease, box-shadow 0.3s ease, transform 0.2s ease;
-      margin-bottom:12px;
-    }
-    .drop-zone:hover { border-color:rgba(255,255,255,0.25); background:rgba(255,255,255,0.04); }
-
-    .drop-zone.dragover {
-      border-color:var(--accent); border-style:solid;
-      background:var(--accent-soft);
-      box-shadow:0 0 50px var(--accent-glow), inset 0 0 40px rgba(10,132,255,0.04);
-      transform:scale(1.015);
-    }
-
-    .drop-zone.has-file {
-      border-style:solid; border-color:rgba(48,209,88,0.30); background:rgba(48,209,88,0.04);
-    }
-
-    .drop-zone__icon { color:var(--text-tertiary); margin-bottom:10px; transition:color 0.3s ease; }
-    .dragover .drop-zone__icon { color:var(--accent); }
-
-    .drop-zone__text { font-size:15px; font-weight:500; color:var(--text-secondary); margin:0 0 4px; word-break:break-all; }
-    .drop-zone__hint { font-size:12px; color:var(--text-muted); margin:0; }
-
-    /* Toggle between default and loaded states */
-    .drop-zone__loaded { display:none; }
-    .drop-zone.has-file .drop-zone__default { display:none; }
-    .drop-zone.has-file .drop-zone__loaded { display:block; }
-
-    #fileInput {
-      position:absolute; inset:0; opacity:0; cursor:pointer; font-size:0;
-    }
-
-    .file-indicator {
-      font-size:13px; color:var(--success); text-align:center; min-height:18px; margin:0 0 16px; font-weight:500; transition:color 0.2s ease;
-    }
-    .file-indicator.is-empty { color:var(--text-muted); font-weight:400; }
-
-    /* ============================================================
-       Phase 4: Stats Pills
-       ============================================================ */
-    .stats-row {
-      display:flex; gap:10px; margin-bottom:16px;
-    }
-
-    .stat-pill {
-      flex:1; min-width:0;
-      background:var(--glass-bg-card);
-      backdrop-filter:blur(var(--blur-button)) saturate(var(--saturate));
-      -webkit-backdrop-filter:blur(var(--blur-button)) saturate(var(--saturate));
-      border:var(--glass-border); border-radius:var(--radius-sm);
-      padding:14px 12px; text-align:center;
-      transition:background 0.3s ease, border-color 0.3s ease, transform 0.2s ease;
-      animation:pillPopIn 0.35s cubic-bezier(0.22,0.61,0.36,1) forwards;
-      opacity:0;
-    }
-    .stat-pill:nth-child(1) { animation-delay:0ms; }
-    .stat-pill:nth-child(2) { animation-delay:80ms; }
-    .stat-pill:nth-child(3) { animation-delay:160ms; }
-
-    @keyframes pillPopIn {
-      from { opacity:0; transform:translateY(10px) scale(0.92); }
-      to   { opacity:1; transform:translateY(0) scale(1); }
-    }
-
-    .stat-pill__value {
-      display:block; font-size:22px; font-weight:700; color:var(--accent); letter-spacing:-0.02em; line-height:1.2;
-      font-variant-numeric:tabular-nums;
-    }
-    .stat-pill__label {
-      display:block; font-size:10px; color:var(--text-tertiary); text-transform:uppercase; letter-spacing:0.06em; margin-top:4px;
-    }
-
-    /* Phase 4b: File bar — full-width row for filename */
-    .file-bar {
-      display:flex; align-items:center; gap:10px;
-      background:var(--glass-bg-card);
-      backdrop-filter:blur(var(--blur-button)) saturate(var(--saturate));
-      -webkit-backdrop-filter:blur(var(--blur-button)) saturate(var(--saturate));
-      border:var(--glass-border); border-radius:var(--radius-sm);
-      padding:12px 16px; margin-bottom:16px;
-    }
-    .file-bar.is-empty .file-bar__name { color:var(--text-muted); }
-
-    .file-bar__name {
-      font-size:13px; font-weight:500; color:var(--text-secondary); word-break:break-all; line-height:1.4;
-    }
-
-    /* ============================================================
-       Buttons
-       ============================================================ */
-    .btn-row {
-      display:flex; gap:12px; margin-bottom:16px;
-    }
-    .btn-row .btn { flex:1; }
-
-    .btn {
-      display:inline-flex; align-items:center; justify-content:center; gap:8px;
-      font-family:inherit; font-size:16px; font-weight:500; letter-spacing:-0.01em;
-      border:none; border-radius:var(--radius-md); cursor:pointer;
-      -webkit-appearance:none; user-select:none; touch-action:manipulation;
-      transition:background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease, opacity 0.2s ease;
-      position:relative; overflow:hidden; white-space:nowrap;
-    }
-
-    .btn::after {
-      content:""; position:absolute; top:0; left:0; right:0; height:50%;
-      background:linear-gradient(to bottom, rgba(255,255,255,0.10), transparent);
-      border-radius:inherit; pointer-events:none; opacity:0; transition:opacity 0.25s ease;
-    }
-    .btn:hover::after { opacity:1; }
-
-    .btn-primary {
-      background:var(--accent); color:#fff; height:50px; padding:0 28px; box-shadow:0 4px 20px var(--accent-glow);
-    }
-    .btn-primary:hover { background:var(--accent-hover); box-shadow:0 6px 28px rgba(64,156,255,0.50); transform:translateY(-1px); }
-    .btn-primary:active { background:#0070e0; box-shadow:0 2px 10px var(--accent-glow); transform:translateY(0) scale(0.98); }
-
-    .btn-secondary {
-      background:rgba(255,255,255,0.14);
-      backdrop-filter:blur(var(--blur-button)) saturate(var(--saturate));
-      -webkit-backdrop-filter:blur(var(--blur-button)) saturate(var(--saturate));
-      border:1px solid rgba(255,255,255,0.18); color:rgba(255,255,255,0.90); height:50px; padding:0 28px;
-    }
-    .btn-secondary:hover { background:rgba(255,255,255,0.22); border-color:rgba(255,255,255,0.35); box-shadow:var(--shadow-md); transform:translateY(-1px); }
-    .btn-secondary:active { background:rgba(255,255,255,0.06); transform:translateY(0) scale(0.98); }
-
-    .btn-block { display:flex; width:100%; }
-
-    .btn-sm { height:38px; padding:0 16px; font-size:14px; border-radius:var(--radius-sm); }
-
-    .btn-danger {
-      background:rgba(255,69,58,0.16);
-      backdrop-filter:blur(var(--blur-button)) saturate(var(--saturate));
-      -webkit-backdrop-filter:blur(var(--blur-button)) saturate(var(--saturate));
-      border:1px solid rgba(255,69,58,0.22); color:var(--danger);
-      height:34px; padding:0 14px; font-size:13px; font-weight:500; border-radius:var(--radius-xs);
-    }
-    .btn-danger:hover { background:rgba(255,69,58,0.26); border-color:rgba(255,69,58,0.40); color:var(--danger-hover); }
-    .btn-danger:active { background:rgba(255,69,58,0.08); }
-
-    .btn:disabled { opacity:0.35; pointer-events:none; cursor:not-allowed; }
-
-    /* ============================================================
-       Inputs
-       ============================================================ */
-    .input-group {
-      display:flex; gap:10px; margin-bottom:18px; align-items:center; flex-wrap:wrap;
-    }
-    input[type="date"], input[type="time"] {
-      font-family:inherit; font-size:15px; padding:10px 14px; border-radius:var(--radius-sm);
-      border:var(--glass-border);
-      background:var(--glass-bg-input);
-      backdrop-filter:blur(20px) saturate(var(--saturate));
-      -webkit-backdrop-filter:blur(20px) saturate(var(--saturate));
-      color:var(--text-primary); color-scheme:dark; -webkit-appearance:none; outline:none;
-      transition:border-color 0.2s ease, box-shadow 0.2s ease; min-width:0;
-    }
-    input[type="date"]:focus, input[type="time"]:focus {
-      border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft);
-    }
-    input[type="date"]::-webkit-calendar-picker-indicator,
-    input[type="time"]::-webkit-calendar-picker-indicator { filter:invert(1); cursor:pointer; opacity:0.7; }
-
-    /* ============================================================
-       Phase 5: Result Day Cards
-       ============================================================ */
-    .section-title {
-      font-size:18px; font-weight:600; color:var(--text-primary); margin:20px 0 10px; letter-spacing:-0.01em;
-    }
-
-    .day-card {
-      background:var(--glass-bg-card);
-      backdrop-filter:blur(var(--blur-button)) saturate(var(--saturate));
-      -webkit-backdrop-filter:blur(var(--blur-button)) saturate(var(--saturate));
-      border:var(--glass-border); border-radius:var(--radius-md);
-      padding:16px 18px; margin-bottom:8px; border-left:3px solid transparent;
-      opacity:0; transform:translateY(14px);
-      animation:cardStaggerIn 0.4s cubic-bezier(0.22,0.61,0.36,1) forwards;
-      animation-delay:calc(var(--i, 0) * 50ms);
-      transition:border-color 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
-    }
-
-    .day-card--overtime { border-left-color:var(--accent); }
-    .day-card--zero { opacity:0; border-left-color:rgba(255,255,255,0.06); animation-name:cardStaggerInZero; }
-
-    @keyframes cardStaggerIn {
-      from { opacity:0; transform:translateY(14px) scale(0.97); }
-      to   { opacity:1; transform:translateY(0) scale(1); }
-    }
-    @keyframes cardStaggerInZero {
-      from { opacity:0; transform:translateY(14px) scale(0.97); }
-      to   { opacity:0.45; transform:translateY(0) scale(1); }
-    }
-
-    .day-card__header {
-      display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:4px;
-    }
-    .day-card__identity { display:flex; align-items:center; flex-wrap:wrap; gap:6px; min-width:0; }
-    .day-card__date { font-weight:600; font-size:15px; color:var(--text-primary); }
-    .day-card__weekday { font-size:12px; font-weight:400; color:var(--text-tertiary); }
-    .day-type-badge {
-      display:inline-flex; align-items:center; min-height:20px; padding:2px 8px;
-      border:1px solid transparent; border-radius:100px;
-      font-size:10px; font-weight:600; line-height:1.35; letter-spacing:0.02em;
-      max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
-    }
-    .day-type-badge--workday {
-      color:rgba(152,205,255,0.95); background:rgba(64,156,255,0.11); border-color:rgba(64,156,255,0.20);
-    }
-    .day-type-badge--weekend {
-      color:rgba(205,172,255,0.95); background:rgba(175,82,222,0.12); border-color:rgba(191,111,255,0.22);
-    }
-    .day-type-badge--holiday {
-      color:rgba(255,158,151,0.98); background:rgba(255,69,58,0.11); border-color:rgba(255,105,97,0.22);
-    }
-    .day-type-badge--adjusted {
-      color:rgba(255,211,140,0.98); background:rgba(255,159,10,0.12); border-color:rgba(255,179,64,0.24);
-    }
-    .day-card__duration { font-weight:700; font-size:16px; color:var(--accent); white-space:nowrap; }
-    .day-card--zero .day-card__duration { color:var(--text-muted); font-weight:500; }
-    .day-card__times { font-size:13px; color:var(--text-tertiary); }
-
-    /* Total summary card */
-    .total-card {
-      display:flex; align-items:center; justify-content:space-between; margin-top:14px;
-      padding:20px 22px;
-      background:var(--glass-bg-elevated);
-      backdrop-filter:blur(var(--blur-button)) saturate(var(--saturate));
-      -webkit-backdrop-filter:blur(var(--blur-button)) saturate(var(--saturate));
-      border:var(--glass-border-strong); border-radius:var(--radius-md);
-      box-shadow:var(--shadow-md);
-    }
-    .total-card__label { font-size:17px; font-weight:600; color:var(--text-primary); }
-    .total-card__value { font-size:26px; font-weight:700; color:var(--accent); letter-spacing:-0.02em; font-variant-numeric:tabular-nums; }
-
-    /* Empty / Error */
-    .empty-state { text-align:center; padding:28px 16px; color:var(--text-muted); font-size:15px; }
-    .calendar-warning {
-      margin:0 0 10px; padding:10px 12px; border-radius:var(--radius-sm);
-      border:1px solid rgba(255,159,10,0.25); background:rgba(255,159,10,0.08);
-      color:rgba(255,214,153,0.92); font-size:12px; line-height:1.5;
-    }
-
-    /* ============================================================
-       Phase 6: Editor Overlay (Bottom Sheet)
-       ============================================================ */
-    .editor-overlay {
-      position:fixed; inset:0; z-index:100; display:flex; align-items:flex-end; justify-content:center;
-      pointer-events:none; opacity:0; transition:opacity 0.35s ease;
-    }
-    .editor-overlay.active { pointer-events:auto; opacity:1; }
-
-    .editor-backdrop {
-      position:absolute; inset:0;
-      background:rgba(0,0,0,0.50);
-      backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
-      cursor:pointer;
-    }
-
-    .editor-panel {
-      position:relative; z-index:1;
-      background:var(--glass-bg-overlay);
-      backdrop-filter:blur(var(--blur-card)) saturate(var(--saturate));
-      -webkit-backdrop-filter:blur(var(--blur-card)) saturate(var(--saturate));
-      border:var(--glass-border); border-bottom:none;
-      border-radius:24px 24px 0 0; max-width:560px; width:100%;
-      max-height:88dvh; overflow-y:auto; -webkit-overflow-scrolling:touch;
-      padding:14px 20px calc(24px + var(--safe-bottom));
-      transform:translateY(100%);
-      transition:transform 0.42s cubic-bezier(0.32,0.72,0,1);
-      touch-action:pan-y;
-    }
-    /* 顶部把手区：唯一的“下拉关闭”手势触发区 */
-    .editor-handle {
-      width:36px; height:5px; background:rgba(255,255,255,0.22); border-radius:100px; margin:0 auto 16px;
-      touch-action:none;
-    }
-    .editor-overlay.active .editor-panel { transform:translateY(0); }
-
-    .editor-handle {
-      width:36px; height:5px; background:rgba(255,255,255,0.22); border-radius:100px; margin:0 auto 16px;
-    }
-
-    .editor-title {
-      font-size:22px; font-weight:600; text-align:center; margin:0 0 4px; color:var(--text-primary);
-    }
-    .editor-subtitle {
-      font-size:13px; color:var(--text-secondary); text-align:center; margin:0 0 18px;
-    }
-
-    .editor-actions {
-      display:flex; flex-direction:column; gap:10px; margin-top:20px;
-    }
-
-    /* Single-punch delete chooser */
-    .delete-overlay {
-      position:fixed; inset:0; z-index:200; display:flex; align-items:flex-end; justify-content:center;
-      pointer-events:none; opacity:0; transition:opacity 0.22s ease;
-    }
-    .delete-overlay.active { pointer-events:auto; opacity:1; }
-    .delete-backdrop { position:absolute; inset:0; background:rgba(0,0,0,0.58); }
-    .delete-panel {
-      position:relative; z-index:1; width:calc(100% - 32px); max-width:480px; margin-bottom:calc(16px + var(--safe-bottom));
-      padding:20px; border:var(--glass-border-strong); border-radius:var(--radius-lg);
-      background:rgba(28,28,38,0.98); box-shadow:var(--shadow-lg);
-      transform:translateY(24px) scale(0.98); transition:transform 0.25s cubic-bezier(0.32,0.72,0,1);
-    }
-    .delete-overlay.active .delete-panel { transform:translateY(0) scale(1); }
-    .delete-title { font-size:18px; font-weight:600; margin-bottom:4px; }
-    .delete-subtitle { font-size:13px; color:var(--text-secondary); margin-bottom:14px; }
-    .delete-list { display:flex; flex-direction:column; gap:8px; max-height:42dvh; overflow-y:auto; }
-    .delete-option {
-      display:flex; align-items:center; justify-content:space-between; gap:12px; width:100%; min-height:50px;
-      padding:9px 10px 9px 14px; border:var(--glass-border); border-radius:var(--radius-sm);
-      background:rgba(255,255,255,0.05); color:var(--text-primary); font:inherit; text-align:left;
-    }
-    .delete-option__label { display:flex; flex-direction:column; }
-    .delete-option__time { font-size:16px; font-weight:600; font-variant-numeric:tabular-nums; }
-    .delete-option__index { font-size:11px; color:var(--text-tertiary); }
-    .delete-option__action { color:var(--danger); font-size:13px; font-weight:600; }
-    .delete-footer { display:flex; flex-direction:column; gap:8px; margin-top:14px; }
-
-    /* Table (inside editor) */
-    .table-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
-
-    table { width:100%; border-collapse:collapse; font-size:14px; }
-    th {
-      text-align:left; padding:12px 10px; font-weight:500; font-size:11px; text-transform:uppercase;
-      letter-spacing:0.04em; color:var(--text-tertiary); border-bottom:1px solid rgba(255,255,255,0.08);
-    }
-    td { padding:12px 10px; border-bottom:1px solid rgba(255,255,255,0.05); color:var(--text-secondary); vertical-align:middle; }
-    tr:last-child td { border-bottom:none; }
-    @media (hover:hover) and (pointer:fine) {
-      tr:hover td { background:rgba(255,255,255,0.025); }
-    }
-    td strong { color:var(--text-primary); font-weight:500; }
-
-    .weekday-tag {
-      display:inline-block; font-size:10px; padding:2px 7px; border-radius:100px; font-weight:500; margin-top:2px;
-      background:rgba(255,255,255,0.07); color:var(--text-tertiary);
-    }
-
-    /* ============================================================
-       Focus & Accessibility
-       ============================================================ */
-    .btn:focus-visible, input:focus-visible {
-      outline:2px solid var(--accent); outline-offset:3px;
-    }
-
-    /* ============================================================
-       Reduced Motion
-       ============================================================ */
-    @media (prefers-reduced-motion: reduce) {
-      *, *::before, *::after {
-        animation-duration:0.01ms !important; animation-iteration-count:1 !important; transition-duration:0.01ms !important;
-      }
-    }
-
-    /* ============================================================
-       Phase 7: Mobile Responsive (≤480px)
-       ============================================================ */
-    @media (max-width: 480px) {
-      .hero { padding:36px 16px 4px; }
-      .hero-orb { width:96px; height:96px; margin-bottom:18px; }
-      .hero-orb__icon { width:36px; height:36px; }
-      .hero-title { font-size:23px; }
-
-      .container { padding:4px 14px calc(20px + var(--safe-bottom)); }
-
-      .drop-zone { padding:26px 16px; border-radius:var(--radius-md); }
-      .drop-zone__text { font-size:14px; }
-      .drop-zone__icon svg { width:30px; height:30px; }
-
-      .stats-row { gap:8px; }
-
-      .file-bar { padding:10px 14px; }
-      .file-bar__name { font-size:12px; }
-
-      .btn-row { flex-direction:row; gap:12px; }
-      .btn-row .btn { height:56px; font-size:15px; padding:0 16px; }
-      .btn-row .btn svg { width:17px; height:17px; }
-
-      .day-card { padding:14px 16px; }
-      .day-card__header { flex-direction:column; gap:2px; }
-      .day-card__duration { font-size:15px; }
-      .total-card { padding:16px 18px; flex-direction:column; align-items:flex-start; gap:6px; }
-      .total-card__value { font-size:22px; }
-
-      .editor-panel { border-radius:20px 20px 0 0; max-height:85dvh; padding:12px 16px calc(18px + var(--safe-bottom)); }
-      .input-group { flex-direction:column; gap:8px; }
-      .input-group input { width:100%; }
-      .input-group .btn-sm { width:100%; }
-
-      /* Touch target minimums */
-      .btn-sm { height:44px; padding:0 20px; }
-      .btn-danger { height:44px; min-width:68px; padding:0 18px; }
-      input[type="date"], input[type="time"] { padding:12px 14px; font-size:16px; }
-    }
-  </style>
-</head>
-<body>
-
-  <!-- ===== Background Scene ===== -->
-  <div class="bg-scene" aria-hidden="true">
-    <div class="bg-orb bg-orb--1"></div>
-    <div class="bg-orb bg-orb--2"></div>
-    <div class="bg-orb bg-orb--3"></div>
-    <div class="bg-orb bg-orb--4"></div>
-  </div>
-  <div class="bg-noise" aria-hidden="true"></div>
-
-  <!-- Phase 1: Floating particles -->
-  <div class="particle-field" aria-hidden="true">
-    <div class="particle p1"></div><div class="particle p2"></div><div class="particle p3"></div>
-    <div class="particle p4"></div><div class="particle p5"></div><div class="particle p6"></div>
-    <div class="particle p7"></div><div class="particle p8"></div><div class="particle p9"></div>
-    <div class="particle p10"></div><div class="particle p11"></div><div class="particle p12"></div>
-  </div>
-
-  <!-- ===== Phase 2: Hero ===== -->
-  <header class="hero">
-    <div class="hero-orb">
-      <svg class="hero-orb__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-      </svg>
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#f3f5f4" />
+    <meta
+      name="description"
+      content="本地优先的加班统计工具：导入打卡 JSON，查看按月热力图，补录记录并导出备份。"
+    />
+    <title>加班月报 · 加班打卡</title>
+    <link rel="icon" type="image/png" href="./icon.png" />
+    <link rel="apple-touch-icon" href="./icon.png" />
+    <link rel="stylesheet" href="./web/styles.css" />
+    <script src="./web/core.js" defer></script>
+    <script src="./web/holidays.js" defer></script>
+    <script src="./web/holiday-service.js" defer></script>
+    <script src="./web/glass.js" defer></script>
+    <script src="./web/app.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">跳到月度统计</a>
+    <svg
+      class="svg-library"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+    >
+      <symbol id="i-clock" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 7v5l3 2" />
+      </symbol>
+      <symbol id="i-calendar" viewBox="0 0 24 24">
+        <rect x="3" y="5" width="18" height="16" rx="4" />
+        <path d="M7 3v4m10-4v4M3 11h18m-13 5h.01m4 0h.01m4 0h.01" />
+      </symbol>
+      <symbol id="i-arrow-left" viewBox="0 0 24 24">
+        <path d="m14 6-6 6 6 6" />
+      </symbol>
+      <symbol id="i-arrow-right" viewBox="0 0 24 24">
+        <path d="m10 6 6 6-6 6" />
+      </symbol>
+      <symbol id="i-upload" viewBox="0 0 24 24">
+        <path
+          d="M12 16V3m-5 5 5-5 5 5M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"
+        />
+      </symbol>
+      <symbol id="i-download" viewBox="0 0 24 24">
+        <path
+          d="M12 3v13m-5-5 5 5 5-5M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"
+        />
+      </symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24">
+        <path d="M12 5v14M5 12h14" />
+      </symbol>
+      <symbol id="i-close" viewBox="0 0 24 24">
+        <path d="m6 6 12 12M18 6 6 18" />
+      </symbol>
+      <symbol id="i-moon" viewBox="0 0 24 24">
+        <path d="M20 14.5A8.8 8.8 0 0 1 9.5 4 8.8 8.8 0 1 0 20 14.5Z" />
+      </symbol>
+      <symbol id="i-sliders" viewBox="0 0 24 24">
+        <path d="M4 7h3m6 0h7M4 17h7m6 0h3" />
+        <circle cx="10" cy="7" r="3" />
+        <circle cx="14" cy="17" r="3" />
+      </symbol>
+      <symbol id="i-file" viewBox="0 0 24 24">
+        <path d="M13 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V10Z" />
+        <path d="M13 3v7h7M8 15h8m-8 3h5" />
+      </symbol>
+      <symbol id="i-spark" viewBox="0 0 24 24">
+        <path d="m12 3 2.4 6.6L21 12l-6.6 2.4L12 21l-2.4-6.6L3 12l6.6-2.4Z" />
+      </symbol>
+      <symbol id="i-check" viewBox="0 0 24 24">
+        <path d="m5 12 4 4L19 6" />
+      </symbol>
+      <symbol id="i-trash" viewBox="0 0 24 24">
+        <path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7" />
+      </symbol>
+      <symbol id="i-refresh" viewBox="0 0 24 24">
+        <path d="M20 8a8.5 8.5 0 1 0 .5 7M20 3v5h-5" />
+      </symbol>
+      <symbol id="i-shield" viewBox="0 0 24 24">
+        <path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6Z" />
+        <path d="m8 12 3 3 5-6" />
+      </symbol>
+    </svg>
+    <div class="scene" aria-hidden="true">
+      <div class="scene-art">
+        <div class="scene-ribbon ribbon-one"></div>
+        <div class="scene-ribbon ribbon-two"></div>
+        <div class="scene-ribbon ribbon-three"></div>
+      </div>
     </div>
-    <h1 class="hero-title">加班时长计算器</h1>
-    <p class="hero-subtitle">拖放 <code>overtime_log.json</code> 自动计算</p>
-  </header>
-
-  <!-- ===== Main Content ===== -->
-  <div class="container">
-
-    <!-- Phase 3: Drop Zone -->
-    <div id="dropZone" class="drop-zone">
-      <label for="fileInput" style="cursor:pointer;display:block;">
-        <!-- Default: no file loaded yet -->
-        <div class="drop-zone__default">
-          <div class="drop-zone__icon">
-            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
-            </svg>
-          </div>
-          <p class="drop-zone__text">拖放 JSON 文件到此处</p>
-          <p class="drop-zone__hint">或点击选择文件</p>
+    <div class="app-shell">
+      <header class="topbar liquid">
+        <a class="brand" href="#main" aria-label="加班打卡，回到月度概览"
+          ><span class="brand-mark"
+            ><svg class="icon"><use href="#i-clock" /></svg></span
+          ><span>加班打卡 <small>WEB</small></span></a
+        >
+        <nav class="top-nav" aria-label="页面导航">
+          <a href="#overview" class="active">月度概览</a
+          ><a href="#records">打卡明细</a>
+        </nav>
+        <div class="top-actions">
+          <button
+            class="icon-button"
+            id="themeButton"
+            aria-label="切换深浅色外观"
+            title="切换外观"
+          >
+            <svg class="icon"><use href="#i-moon" /></svg></button
+          ><button
+            class="icon-button"
+            id="settingsButton"
+            aria-label="偏好设置"
+            title="偏好设置"
+          >
+            <svg class="icon"><use href="#i-sliders" /></svg>
+          </button>
         </div>
-        <!-- Loaded: file selected successfully -->
-        <div class="drop-zone__loaded">
-          <div class="drop-zone__icon" style="color:var(--success);">
-            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
-            </svg>
+      </header>
+      <main id="main">
+        <section class="page-heading" id="overview" aria-labelledby="pageTitle">
+          <div>
+            <p class="eyebrow">
+              <span class="status-dot"></span> 每一刻，都算数
+            </p>
+            <h1 id="pageTitle">
+              加班<span>月报</span><span class="heading-dot">.</span>
+            </h1>
+            <p class="page-subtitle">按月整理打卡，让努力一目了然。</p>
           </div>
-          <p class="drop-zone__text" id="dropZoneLoadedName" style="color:var(--success);">—</p>
-          <p class="drop-zone__hint" style="color:var(--text-tertiary);">点击可更换文件</p>
+          <div class="month-controls">
+            <div class="month-switch liquid">
+              <button
+                class="icon-button"
+                id="previousMonth"
+                aria-label="上个月"
+              >
+                <svg class="icon"><use href="#i-arrow-left" /></svg></button
+              ><button
+                class="month-label"
+                id="monthPickerButton"
+                aria-haspopup="dialog"
+              >
+                <svg class="icon"><use href="#i-calendar" /></svg
+                ><span id="selectedMonthLabel">—</span></button
+              ><button class="icon-button" id="nextMonth" aria-label="下个月">
+                <svg class="icon"><use href="#i-arrow-right" /></svg>
+              </button>
+            </div>
+            <button class="text-button" id="currentMonthButton">
+              回到本月
+            </button>
+          </div>
+        </section>
+        <section
+          class="recovery-banner"
+          id="recoveryBanner"
+          hidden
+          aria-label="本地草稿"
+        >
+          <div>
+            <strong>接着上次的记录</strong>
+            <p id="recoveryDescription"></p>
+          </div>
+          <div class="banner-actions">
+            <button class="button primary small" id="restoreDraftButton">
+              恢复草稿</button
+            ><button class="text-button" id="discardDraftButton">忽略</button>
+          </div>
+        </section>
+        <section
+          class="conflict-banner"
+          id="conflictBanner"
+          hidden
+          role="status"
+        >
+          <strong>另一标签页更新了浏览器草稿</strong>
+          <p>
+            已暂停本页的自动暂存，防止相互覆盖。本页记录仍在，请先导出备份，再刷新页面恢复需要的版本。
+          </p>
+        </section>
+        <section
+          class="import-card glass"
+          id="dropZone"
+          aria-label="导入打卡记录"
+        >
+          <span class="file-symbol"
+            ><svg class="icon"><use href="#i-file" /></svg
+          ></span>
+          <div class="file-copy">
+            <h2 id="fileTitle">从一份记录，开始整理</h2>
+            <p id="fileName">拖放 JSON 文件，或选择已有打卡记录</p>
+            <span class="save-status" id="saveStatus"
+              >文件留在本机，记录不上传</span
+            >
+          </div>
+          <div class="import-actions">
+            <button class="button soft" id="importButton">
+              <svg class="icon"><use href="#i-upload" /></svg
+              ><span id="importButtonLabel">导入 JSON</span>
+            </button>
+            <div class="first-run-actions">
+              <button class="text-button" id="sampleButton">体验示例</button
+              ><span aria-hidden="true">·</span
+              ><button class="text-button" id="newWorkspaceButton">
+                新建记录
+              </button>
+            </div>
+          </div>
+          <input
+            type="file"
+            id="fileInput"
+            accept=".json,application/json"
+            hidden
+          />
+          <span id="dropZoneLoadedName" class="sr-only"></span
+          ><span id="fileBar" class="sr-only is-empty"
+            ><span id="statFile">未加载文件</span></span
+          >
+        </section>
+        <section
+          class="stats-grid"
+          aria-label="月度汇总"
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          <article class="stat-card glass stat-primary">
+            <div class="stat-top">
+              <span>本月加班</span
+              ><svg class="icon"><use href="#i-clock" /></svg>
+            </div>
+            <p class="stat-number">
+              <span id="statHours">—</span><span class="stat-unit">小时</span>
+            </p>
+            <p class="stat-foot" id="statTotalCaption">导入记录后自动统计</p>
+            <div class="stat-decoration" aria-hidden="true"></div>
+          </article>
+          <article class="stat-card glass">
+            <div class="stat-top">
+              <span>记录天数</span
+              ><svg class="icon"><use href="#i-calendar" /></svg>
+            </div>
+            <p class="stat-number">
+              <span id="statDays">—</span><span class="stat-unit">天</span>
+            </p>
+            <p class="stat-foot" id="statPunchCaption">从打卡中还原你的日常</p>
+          </article>
+          <article class="stat-card glass">
+            <div class="stat-top">
+              <span>加班天数</span
+              ><svg class="icon"><use href="#i-spark" /></svg>
+            </div>
+            <p class="stat-number">
+              <span id="statOvertimeDays">—</span
+              ><span class="stat-unit">天</span>
+            </p>
+            <p class="stat-foot">实际加班大于 0 的日期</p>
+          </article>
+          <article class="stat-card glass">
+            <div class="stat-top">
+              <span>平均加班</span
+              ><svg class="icon"><use href="#i-clock" /></svg>
+            </div>
+            <p class="stat-number">
+              <span id="statAverage">—</span
+              ><span class="stat-unit">小时 / 天</span>
+            </p>
+            <p class="stat-foot">仅按有加班的日期计算</p>
+          </article>
+        </section>
+        <div class="overview-grid">
+          <section class="calendar-card glass" aria-labelledby="calendarTitle">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">MONTHLY RHYTHM</p>
+                <h2 id="calendarTitle">这一月的节奏</h2>
+              </div>
+              <span class="subtle-pill" id="calendarMonthLabel">—</span>
+            </div>
+            <div class="weekdays" aria-hidden="true">
+              <span>一</span><span>二</span><span>三</span><span>四</span
+              ><span>五</span><span class="weekend">六</span
+              ><span class="weekend">日</span>
+            </div>
+            <div
+              class="calendar-grid"
+              id="calendarGrid"
+              role="group"
+              aria-label="月度加班热力图"
+            ></div>
+            <div class="calendar-bottom">
+              <p>
+                <span class="today-marker" aria-hidden="true"></span> 今天
+                <span class="legend-separator">·</span> 点按日期查看记录
+              </p>
+              <div
+                class="heat-legend"
+                aria-label="颜色由浅到深：无加班、少于1小时、1至3小时、3至6小时、6小时及以上"
+              >
+                <span>少</span><i data-level="0"></i><i data-level="1"></i
+                ><i data-level="2"></i><i data-level="3"></i
+                ><i data-level="4"></i><span>多</span>
+              </div>
+            </div>
+          </section>
+          <aside class="insights-column">
+            <section class="insight-card glass">
+              <div class="insight-icon">
+                <svg class="icon"><use href="#i-spark" /></svg>
+              </div>
+              <p class="eyebrow">月度一瞥</p>
+              <h2 id="insightTitle">时间会留下答案</h2>
+              <p id="insightText">载入一份记录，看看这一月的工作节奏。</p>
+              <div
+                class="mini-chart"
+                id="weeklyChart"
+                aria-label="按周加班时长"
+              ></div>
+              <div class="insight-note" id="incompleteNotice" hidden></div>
+            </section>
+            <section class="rules-card glass">
+              <span class="rule-icon"
+                ><svg class="icon"><use href="#i-shield" /></svg
+              ></span>
+              <h2>安心记在本机</h2>
+              <p>
+                记录不上传。更改会尝试暂存到此浏览器，记得导出 JSON 留一份备份。
+              </p>
+              <div class="rule-divider"></div>
+              <p class="calculation-rule" id="ruleSummary">
+                工作日 17:30 后计入加班<br />休息日按首末打卡间隔计算
+              </p>
+              <span class="zone-label" id="timezoneLabel"></span>
+            </section>
+          </aside>
         </div>
-      </label>
-      <input type="file" id="fileInput" accept=".json" onchange="handleFileSelect()" />
+        <section
+          class="records-card glass"
+          id="records"
+          aria-labelledby="recordsTitle"
+        >
+          <div class="section-heading records-heading">
+            <div>
+              <p class="eyebrow">DAILY RECORDS</p>
+              <h2 id="recordsTitle">
+                打卡明细 <span class="count-badge" id="recordCount">0</span>
+              </h2>
+            </div>
+            <div class="record-tools">
+              <button
+                class="icon-button"
+                id="calculateButton"
+                aria-label="重新计算"
+                title="重新计算"
+              >
+                <svg class="icon"><use href="#i-refresh" /></svg></button
+              ><button class="button soft small" id="csvButton" disabled>
+                <svg class="icon"><use href="#i-download" /></svg>导出 CSV
+              </button>
+            </div>
+          </div>
+          <div class="records-toolbar">
+            <div class="segmented" id="recordFilters" aria-label="筛选打卡明细">
+              <button
+                type="button"
+                class="selected"
+                data-filter="all"
+                aria-pressed="true"
+              >
+                全部记录</button
+              ><button
+                type="button"
+                data-filter="overtime"
+                aria-pressed="false"
+              >
+                有加班</button
+              ><button
+                type="button"
+                data-filter="incomplete"
+                aria-pressed="false"
+              >
+                待补全 <span id="incompleteCount">0</span>
+              </button>
+            </div>
+            <button
+              class="text-button sort-button"
+              id="sortButton"
+              aria-label="切换排序，目前最新在前"
+            >
+              最新在前 <span aria-hidden="true">↓</span>
+            </button>
+          </div>
+          <div id="calendarStatus" class="calendar-status" role="status"></div>
+          <div id="result">
+            <div class="empty-state">
+              <span class="empty-symbol"
+                ><svg class="icon"><use href="#i-calendar" /></svg
+              ></span>
+              <h3>给时间一个落点</h3>
+              <p>
+                导入打卡文件，或新建一份记录。<br />这个月的努力，会在这里慢慢展开。
+              </p>
+            </div>
+          </div>
+          <div class="records-footer">
+            <span id="recordsSummary">等待载入记录</span
+            ><button class="text-button" id="addRecordButton" disabled>
+              <svg class="icon"><use href="#i-plus" /></svg>补录一条
+            </button>
+          </div>
+        </section>
+        <footer class="page-footer">
+          <span>加班打卡 · 为你的时间留一份记录</span
+          ><a
+            href="https://github.com/NiceXHZ/calculate_overtime"
+            target="_blank"
+            rel="noopener noreferrer"
+            >项目与使用说明 <span aria-hidden="true">↗</span></a
+          >
+        </footer>
+      </main>
     </div>
-
-    <div class="file-indicator is-empty" id="fileName">未选择文件</div>
-
-    <!-- Action Buttons (above stats, won't jump) -->
-    <div class="btn-row">
-      <button class="btn btn-primary" id="calculateButton" onclick="processFile()">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-        </svg>
-        计算加班
+    <nav class="action-dock liquid" aria-label="记录操作">
+      <button id="dockImport">
+        <svg class="icon"><use href="#i-upload" /></svg
+        ><span>导入记录</span></button
+      ><span class="dock-divider" aria-hidden="true"></span
+      ><button id="dockAdd" class="dock-main" disabled>
+        <svg class="icon"><use href="#i-plus" /></svg
+        ><span>补录打卡</span></button
+      ><span class="dock-divider" aria-hidden="true"></span
+      ><button id="dockExport" disabled>
+        <svg class="icon"><use href="#i-download" /></svg><span>导出备份</span
+        ><span
+          class="unsaved-dot"
+          id="unsavedDot"
+          hidden
+          aria-label="有未导出的更改"
+        ></span>
       </button>
-      <button class="btn btn-secondary" onclick="openEditorOverlay()">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-        </svg>
-        管理数据
+    </nav>
+    <div class="toast" id="toast" hidden role="status" aria-live="polite">
+      <span id="toastText"></span><button id="undoButton" hidden>撤销</button
+      ><button class="toast-close" id="closeToast" aria-label="关闭提示">
+        ×
       </button>
     </div>
-
-    <!-- Phase 4: Stats Pills (always visible, placeholder until calculated) -->
-    <div class="stats-row" id="statsRow">
-      <div class="stat-pill">
-        <span class="stat-pill__value" id="statDays">—</span>
-        <span class="stat-pill__label">记录天数</span>
+    <dialog
+      id="monthOverlay"
+      class="sheet month-sheet"
+      aria-labelledby="monthTitle"
+    >
+      <div class="sheet-panel">
+        <div class="sheet-handle" aria-hidden="true"></div>
+        <header class="sheet-heading">
+          <div>
+            <p class="eyebrow">按月回看</p>
+            <h2 id="monthTitle">选择月份</h2>
+          </div>
+          <button
+            class="icon-button"
+            data-close="monthOverlay"
+            aria-label="关闭月份选择"
+          >
+            <svg class="icon"><use href="#i-close" /></svg>
+          </button>
+        </header>
+        <div class="sheet-body">
+          <div class="year-picker">
+            <button class="icon-button" id="previousYear" aria-label="上一年">
+              <svg class="icon"><use href="#i-arrow-left" /></svg></button
+            ><label
+              ><span class="sr-only">年份</span
+              ><input
+                id="yearInput"
+                type="number"
+                min="0"
+                max="9999"
+                step="1"
+                inputmode="numeric"
+                value="2026"
+              />
+              <span>年</span></label
+            ><button class="icon-button" id="nextYear" aria-label="下一年">
+              <svg class="icon"><use href="#i-arrow-right" /></svg>
+            </button>
+          </div>
+          <p class="field-error" id="yearError" role="status"></p>
+          <div class="month-grid" id="monthGrid"></div>
+          <div class="saved-months" id="savedMonths"></div>
+        </div>
+        <footer class="sheet-footer">
+          <button class="button primary full" id="monthTodayButton">
+            回到本月
+          </button>
+        </footer>
       </div>
-      <div class="stat-pill">
-        <span class="stat-pill__value" id="statHours">—</span>
-        <span class="stat-pill__label">加班小时</span>
+    </dialog>
+    <dialog
+      id="editorOverlay"
+      class="sheet editor-overlay"
+      aria-labelledby="editorTitle"
+    >
+      <div class="sheet-panel" id="editorPanel">
+        <div class="sheet-handle" aria-hidden="true"></div>
+        <header class="sheet-heading">
+          <div>
+            <p class="eyebrow">补上遗漏的时刻</p>
+            <h2 id="editorTitle">补录打卡</h2>
+          </div>
+          <button
+            class="icon-button"
+            data-close="editorOverlay"
+            aria-label="关闭补录打卡"
+          >
+            <svg class="icon"><use href="#i-close" /></svg>
+          </button>
+        </header>
+        <div class="sheet-body">
+          <p class="sheet-description" id="editorDescription">
+            可补录当前查看月份的记录。
+          </p>
+          <form id="punchForm">
+            <div class="input-group">
+              <label class="picker-field"
+                >日期<input
+                  type="date"
+                  id="newDate"
+                  required
+                  autofocus
+                  aria-describedby="punchError" /></label
+              ><label class="picker-field"
+                >时间<input
+                  type="time"
+                  id="newTime"
+                  required
+                  step="60"
+                  aria-describedby="punchError"
+              /></label>
+            </div>
+            <p class="field-error" id="punchError" role="status"></p>
+          </form>
+          <div class="editor-history">
+            <h3>本月已有记录</h3>
+            <div class="table-wrap">
+              <table id="dataTable">
+                <thead>
+                  <tr>
+                    <th scope="col">日期</th>
+                    <th scope="col">打卡时间</th>
+                    <th scope="col"><span class="sr-only">操作</span></th>
+                  </tr>
+                </thead>
+                <tbody id="tableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <footer class="sheet-footer">
+          <button
+            class="button primary full"
+            id="savePunchButton"
+            type="submit"
+            form="punchForm"
+          >
+            <svg class="icon"><use href="#i-plus" /></svg>保存打卡
+          </button>
+          <p class="sheet-footnote">
+            更改暂存在浏览器中，导出 JSON 才是独立备份。
+          </p>
+          <button class="text-button full" id="editorUndoButton" hidden>
+            撤销上次修改
+          </button>
+        </footer>
       </div>
-    </div>
-    <div class="file-bar is-empty" id="fileBar">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;opacity:0.5;">
-        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
-      </svg>
-      <span class="file-bar__name" id="statFile">未加载文件</span>
-    </div>
-
-    <!-- Results -->
-    <div id="result"></div>
-  </div>
-
-  <!-- ===== Phase 6: Editor Overlay ===== -->
-  <div id="editorOverlay" class="editor-overlay">
-    <div class="editor-backdrop" id="editorBackdrop"></div>
-    <div class="editor-panel" id="editorPanel">
-      <div class="editor-handle"></div>
-      <h2 class="editor-title">数据编辑器</h2>
-      <p class="editor-subtitle">修改本月记录 — 修改后请下载新文件</p>
-
-      <div class="input-group">
-        <input type="date" id="newDate" aria-label="选择日期" />
-        <input type="time" id="newTime" aria-label="选择时间" />
-        <button class="btn btn-primary btn-sm" onclick="addEntry()">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-          </svg>
-          添加
-        </button>
+    </dialog>
+    <dialog
+      id="deleteOverlay"
+      class="sheet day-sheet delete-overlay"
+      aria-labelledby="deleteTitle"
+    >
+      <div class="sheet-panel">
+        <div class="sheet-handle" aria-hidden="true"></div>
+        <header class="sheet-heading">
+          <div>
+            <p class="eyebrow" id="deleteSubtitle"></p>
+            <h2 id="deleteTitle">当天记录</h2>
+          </div>
+          <button
+            class="icon-button"
+            data-close="deleteOverlay"
+            aria-label="关闭当天记录"
+          >
+            <svg class="icon"><use href="#i-close" /></svg>
+          </button>
+        </header>
+        <div class="sheet-body">
+          <div class="day-summary" id="daySummary"></div>
+          <div class="day-timeline" id="deleteList"></div>
+          <button class="text-button full" id="morePunchesButton" hidden>
+            再显示 100 条</button
+          ><button class="text-button danger-text" id="deleteDayButton">
+            删除当天全部记录
+          </button>
+        </div>
+        <footer class="sheet-footer">
+          <button class="button primary full" id="dayAddButton">
+            <svg class="icon"><use href="#i-plus" /></svg>补录这一天
+          </button>
+          <div class="day-footer-actions">
+            <button class="button soft full" data-close="deleteOverlay">
+              返回月报</button
+            ><button class="text-button" id="dayUndoButton" hidden>
+              撤销上次修改
+            </button>
+          </div>
+        </footer>
       </div>
-
-      <div class="table-wrap">
-        <table id="dataTable">
-          <thead>
-            <tr><th style="width:25%">日期</th><th>打卡时间</th><th style="width:15%">操作</th></tr>
-          </thead>
-          <tbody id="tableBody"></tbody>
-        </table>
+    </dialog>
+    <dialog
+      id="settingsOverlay"
+      class="sheet settings-sheet"
+      aria-labelledby="settingsTitle"
+    >
+      <div class="sheet-panel">
+        <div class="sheet-handle" aria-hidden="true"></div>
+        <header class="sheet-heading">
+          <div>
+            <p class="eyebrow">按你的习惯来</p>
+            <h2 id="settingsTitle">偏好设置</h2>
+          </div>
+          <button
+            class="icon-button"
+            data-close="settingsOverlay"
+            aria-label="关闭偏好设置"
+          >
+            <svg class="icon"><use href="#i-close" /></svg>
+          </button>
+        </header>
+        <div class="sheet-body">
+          <div class="setting-row">
+            <label for="appearanceSelect"
+              ><strong>外观</strong><span>浅色、深色，或跟随系统</span></label
+            ><select id="appearanceSelect">
+              <option value="system">跟随系统</option>
+              <option value="light">浅色</option>
+              <option value="dark">深色</option>
+            </select>
+          </div>
+          <div class="setting-row">
+            <label for="glassToggle"
+              ><strong>玻璃效果</strong
+              ><span>关闭后使用更清晰的不透明界面</span></label
+            ><input type="checkbox" id="glassToggle" class="switch" checked />
+          </div>
+          <div class="setting-row">
+            <label for="cutoffInput"
+              ><strong>工作日下班时间</strong
+              ><span>工作日末次打卡超过此时才计入</span></label
+            ><input
+              type="time"
+              id="cutoffInput"
+              value="17:30"
+              step="60"
+              required
+            />
+          </div>
+          <p class="field-error" id="settingsError" role="status"></p>
+          <div class="settings-note">
+            <h3>计算方式</h3>
+            <p>
+              休息日取首次到末次打卡的间隔，只有一次打卡时待补全。不扣午休，不自动配对上下班，不合并跨日记录。
+            </p>
+            <p id="settingsZone"></p>
+          </div>
+          <div class="setting-row">
+            <div>
+              <strong>节假日与调休</strong
+              ><span id="holidaySource">内置 2025、2026 年安排</span>
+            </div>
+            <button class="button soft small" id="refreshHolidaysButton">
+              刷新安排
+            </button>
+          </div>
+          <p class="settings-note">
+            记录只保留在本机。联网仅用于公开节假日数据；浏览器草稿不等同于原文件，清理网站数据会删除草稿。
+          </p>
+        </div>
+        <footer class="sheet-footer">
+          <button class="button primary full" id="settingsDone">完成</button>
+        </footer>
       </div>
-
-      <div class="editor-actions">
-        <button class="btn btn-primary btn-block" onclick="saveAndDownload()">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-          </svg>
-          保存并导出新文件
-        </button>
-        <button class="btn btn-secondary btn-block" onclick="closeEditorOverlay()">返回计算器</button>
+    </dialog>
+    <dialog
+      id="confirmOverlay"
+      class="sheet confirm-sheet"
+      aria-labelledby="confirmTitle"
+    >
+      <div class="sheet-panel">
+        <div class="sheet-handle" aria-hidden="true"></div>
+        <header class="sheet-heading">
+          <h2 id="confirmTitle">确认操作</h2>
+          <button
+            class="icon-button"
+            data-close="confirmOverlay"
+            aria-label="取消操作"
+          >
+            <svg class="icon"><use href="#i-close" /></svg>
+          </button>
+        </header>
+        <div class="sheet-body"><p id="confirmMessage"></p></div>
+        <footer class="sheet-footer">
+          <button class="button danger full" id="confirmAccept">确认</button
+          ><button class="button soft full" data-close="confirmOverlay">
+            取消
+          </button>
+        </footer>
       </div>
-    </div>
-  </div>
-
-  <div id="deleteOverlay" class="delete-overlay" aria-hidden="true">
-    <div class="delete-backdrop" id="deleteBackdrop"></div>
-    <div class="delete-panel" role="dialog" aria-modal="true" aria-labelledby="deleteTitle">
-      <h3 class="delete-title" id="deleteTitle">选择要删除的打卡</h3>
-      <p class="delete-subtitle" id="deleteSubtitle"></p>
-      <div class="delete-list" id="deleteList"></div>
-      <div class="delete-footer">
-        <button class="btn btn-danger btn-block" onclick="deleteDay()">删除当天全部记录</button>
-        <button class="btn btn-secondary btn-block" onclick="closeDeletePicker()">取消</button>
-      </div>
-    </div>
-  </div>
-
-  <script>
-    // ============================================================
-    // Global state
-    // ============================================================
-    let globalData = {};
-    let currentFileName = "overtime_log.json";
-    let dataLoaded = false;
-    let loadingData = false;
-    let loadVersion = 0;
-    let calculationRunVersion = 0;
-    let editorOpenedAt = 0; // 编辑器打开时间戳，用于 backdrop 防误触
-    let pendingDeleteDate = null;
-    const HOLIDAY_CACHE_PREFIX = 'overtime-holidays-v1-';
-    const HOLIDAY_CACHE_TTL = 7 * 24 * 60 * 60 * 1000;
-    const HOLIDAY_RETRY_DELAY = 5 * 60 * 1000;
-    const MAX_FILE_BYTES = 8 * 1024 * 1024;
-    const holidayMemoryCache = {};
-    const holidayRequests = {};
-    const holidayRetryAfter = {};
-
-    // Dates are interpreted in the browser's local timezone, as in the editor.
-    function localDateKey(date) {
-      return String(date.getFullYear()).padStart(4, '0') + '-' +
-        String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
-    }
-
-    function parseDateKey(value) {
-      if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-        throw new Error('日期必须使用 YYYY-MM-DD 格式');
-      }
-      var date = new Date(value + 'T00:00:00');
-      if (!Number.isFinite(date.getTime()) || localDateKey(date) !== value) {
-        throw new Error('无效日期：' + value);
-      }
-      return date;
-    }
-
-    function parseEntry(value, dateStr) {
-      var isNumber = typeof value === 'number' && Number.isSafeInteger(value);
-      var isISO = typeof value === 'string' &&
-        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/.test(value);
-      if (!isNumber && !isISO) throw new Error('打卡时间须为毫秒时间戳或带时区的 ISO 时间字符串');
-      if (isISO) {
-        parseDateKey(value.slice(0, 10));
-        if (Number(value.slice(11, 13)) > 23 || Number(value.slice(14, 16)) > 59 ||
-            Number(value.slice(17, 19)) > 59) throw new Error('无效的打卡时间');
-      }
-      if (isNumber) {
-        var secondsDate = new Date(value * 1000);
-        if (Number.isFinite(secondsDate.getTime()) && dateStr && localDateKey(new Date(value)) !== dateStr && localDateKey(secondsDate) === dateStr) {
-          throw new Error('数字时间戳必须使用毫秒，不能使用秒');
-        }
-      }
-      var date = new Date(value);
-      if (!Number.isFinite(date.getTime())) throw new Error('无效的打卡时间');
-      if (dateStr && localDateKey(date) !== dateStr) {
-        throw new Error('打卡时间日期必须与记录日期一致，不支持跨日打卡');
-      }
-      return date;
-    }
-
-    function formatEntry(date) {
-      // Legacy timezone offsets may contain seconds; retain exact instants as supported milliseconds.
-      if (date.getSeconds() !== date.getUTCSeconds()) return date.getTime();
-      var offset = -date.getTimezoneOffset();
-      var sign = offset >= 0 ? '+' : '-';
-      var absOffset = Math.abs(offset);
-      var milliseconds = date.getMilliseconds();
-      return localDateKey(date) + 'T' + date.toTimeString().slice(0, 8) +
-        (milliseconds ? '.' + String(milliseconds).padStart(3, '0') : '') + sign +
-        String(Math.floor(absOffset / 60)).padStart(2, '0') + ':' + String(absOffset % 60).padStart(2, '0');
-    }
-
-    // Normalize legacy iOS strings, scalar timestamps and mixed arrays once on import.
-    // Keep unrelated record fields and all months when exporting.
-    function normalizeData(data) {
-      if (!data || typeof data !== 'object' || Array.isArray(data)) {
-        throw new Error('JSON 顶层必须是按日期索引的对象');
-      }
-      var normalized = {};
-      Object.keys(data).sort().forEach(function(dateStr) {
-        parseDateKey(dateStr);
-        var value = data[dateStr];
-        if (!value || typeof value !== 'object' || Array.isArray(value) ||
-            !Object.prototype.hasOwnProperty.call(value, 'entries')) {
-          throw new Error(dateStr + ' 缺少有效的 entries 字段');
-        }
-        var entries = Array.isArray(value.entries) ? value.entries : [value.entries];
-        var dates = entries.map(function(entry) {
-          try { return parseEntry(entry, dateStr); }
-          catch (err) { throw new Error(dateStr + '：' + err.message); }
-        }).sort(function(a, b) { return a - b; });
-        normalized[dateStr] = { ...value, entries: dates.map(formatEntry) };
-      });
-      return normalized;
-    }
-
-    function addHolidayDay(days, dateStr, isOffDay, name) {
-      parseDateKey(dateStr);
-      days[dateStr] = { isOffDay: isOffDay, name: name || (isOffDay ? '节假日' : '调休上班') };
-    }
-
-    function escapeHtml(value) {
-      return String(value).replace(/[&<>"']/g, function(char) {
-        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char];
-      });
-    }
-
-    function parseHolidayCn(data, year) {
-      if (!data || data.year !== year || !Array.isArray(data.days) || data.days.length === 0) {
-        throw new Error('holiday-cn 数据格式无效');
-      }
-      var days = {};
-      data.days.forEach(function(day) {
-        if (!day || typeof day.isOffDay !== 'boolean') throw new Error('holiday-cn 日期数据无效');
-        addHolidayDay(days, day.date, day.isOffDay, day.name);
-      });
-      return days;
-    }
-
-    function parseShuyzCalendar(data, year) {
-      var holidays = data && data.Years && data.Years[String(year)];
-      if (!Array.isArray(holidays) || holidays.length === 0) throw new Error('china-holiday-calender 数据格式无效');
-      var days = {};
-      holidays.forEach(function(holiday) {
-        var current = parseDateKey(holiday.StartDate);
-        var end = parseDateKey(holiday.EndDate);
-        if (current > end) throw new Error('china-holiday-calender 日期范围无效');
-        while (current <= end) {
-          addHolidayDay(days, localDateKey(current), true, holiday.Name);
-          current.setDate(current.getDate() + 1);
-        }
-      });
-      // Apply compensation days last so they always override an overlapping holiday range.
-      holidays.forEach(function(holiday) {
-        (holiday.CompDays || []).forEach(function(dateStr) {
-          addHolidayDay(days, dateStr, false, '调休上班');
-        });
-      });
-      return days;
-    }
-
-    function parseTimorCalendar(data) {
-      if (!data || data.code !== 0 || !data.holiday || typeof data.holiday !== 'object') {
-        throw new Error('Timor 节假日数据格式无效');
-      }
-      var keys = Object.keys(data.holiday);
-      if (keys.length === 0) throw new Error('Timor 节假日数据为空');
-      var days = {};
-      keys.forEach(function(key) {
-        var day = data.holiday[key];
-        if (!day || typeof day.holiday !== 'boolean') throw new Error('Timor 日期数据无效');
-        addHolidayDay(days, day.date, day.holiday, day.name);
-      });
-      return days;
-    }
-
-    function fetchHolidayJson(url) {
-      var controller = (typeof AbortController === 'function') ? new AbortController() : null;
-      var timer = setTimeout(function() { if (controller) controller.abort(); }, 5000);
-      return fetch(url, controller ? { signal: controller.signal } : {}).then(function(response) {
-        if (!response.ok) throw new Error('HTTP ' + response.status);
-        return response.json();
-      }).finally(function() { clearTimeout(timer); });
-    }
-
-    function readHolidayCache(year) {
-      try {
-        var raw = localStorage.getItem(HOLIDAY_CACHE_PREFIX + year);
-        if (!raw) return null;
-        var cached = JSON.parse(raw);
-        if (!cached || cached.year !== year || !Number.isFinite(cached.fetchedAt) ||
-            !cached.days || typeof cached.days !== 'object') return null;
-        Object.keys(cached.days).forEach(function(dateStr) {
-          parseDateKey(dateStr);
-          if (!cached.days[dateStr] || typeof cached.days[dateStr].isOffDay !== 'boolean' ||
-              typeof cached.days[dateStr].name !== 'string') throw new Error('缓存日期无效');
-        });
-        return cached;
-      } catch (err) {
-        try { localStorage.removeItem(HOLIDAY_CACHE_PREFIX + year); } catch (_) {}
-        return null;
-      }
-    }
-
-    function writeHolidayCache(calendar) {
-      try { localStorage.setItem(HOLIDAY_CACHE_PREFIX + calendar.year, JSON.stringify(calendar)); }
-      catch (err) { console.warn('无法保存节假日缓存：', err); }
-    }
-
-    async function refreshHolidayCalendar(year, staleCache) {
-      var sources = [
-        {
-          name: 'holiday-cn',
-          load: async function() {
-            var days = parseHolidayCn(await fetchHolidayJson(
-              'https://cdn.jsdelivr.net/gh/NateScarlet/holiday-cn@master/' + year + '.json'
-            ), year);
-            var followingYearChecked = false;
-            var now = new Date();
-            // The following year's notice can contain corrections for late December.
-            if (now.getFullYear() === year && now.getMonth() === 11) {
-              followingYearChecked = true;
-              try {
-                var followingDays = parseHolidayCn(await fetchHolidayJson(
-                  'https://cdn.jsdelivr.net/gh/NateScarlet/holiday-cn@master/' + (year + 1) + '.json'
-                ), year + 1);
-                Object.keys(followingDays).forEach(function(dateStr) {
-                  if (dateStr.indexOf(year + '-') === 0) days[dateStr] = followingDays[dateStr];
-                });
-              } catch (err) { console.warn('下一年度通知尚不可用，保留本年度节假日', err); }
-            }
-            return { days: days, followingYearChecked: followingYearChecked };
-          }
-        },
-        {
-          name: 'china-holiday-calender',
-          load: async function() {
-            return { days: parseShuyzCalendar(await fetchHolidayJson(
-              'https://www.shuyz.com/githubfiles/china-holiday-calender/master/holidayAPI.json'
-            ), year) };
-          }
-        },
-        {
-          name: 'Timor',
-          load: async function() {
-            return { days: parseTimorCalendar(await fetchHolidayJson(
-              'https://timor.tech/api/holiday/year/' + year
-            )) };
-          }
-        }
-      ];
-
-      for (var i = 0; i < sources.length; i++) {
-        try {
-          var source = sources[i];
-          var loaded = await source.load();
-          var calendar = {
-            year: year,
-            fetchedAt: Date.now(),
-            source: source.name,
-            days: loaded.days,
-            followingYearChecked: loaded.followingYearChecked === true
-          };
-          delete holidayRetryAfter[year];
-          writeHolidayCache(calendar);
-          return calendar;
-        } catch (err) {
-          console.warn('节假日数据源不可用：' + sources[i].name, err);
-        }
-      }
-      holidayRetryAfter[year] = Date.now() + HOLIDAY_RETRY_DELAY;
-      return staleCache;
-    }
-
-    function loadHolidayCalendar(year) {
-      var cached = holidayMemoryCache[year] || readHolidayCache(year);
-      var now = new Date();
-      var needsDecemberRefresh = cached && cached.source === 'holiday-cn' &&
-        now.getFullYear() === year && now.getMonth() === 11 && cached.followingYearChecked !== true;
-      if (cached && !needsDecemberRefresh && Date.now() - cached.fetchedAt < HOLIDAY_CACHE_TTL) {
-        holidayMemoryCache[year] = cached;
-        return cached;
-      }
-      if (holidayRetryAfter[year] && Date.now() < holidayRetryAfter[year]) return cached;
-      if (!holidayRequests[year]) {
-        holidayRequests[year] = refreshHolidayCalendar(year, cached).then(function(calendar) {
-          if (calendar) holidayMemoryCache[year] = calendar;
-          return calendar;
-        }).catch(function(err) {
-          console.warn('节假日数据加载失败：', err);
-          return cached;
-        }).finally(function() {
-          delete holidayRequests[year];
-        });
-      }
-      return holidayRequests[year];
-    }
-
-    function hasCurrentMonthEntries(year, month) {
-      for (var dateStr in globalData) {
-        if (!Object.prototype.hasOwnProperty.call(globalData, dateStr)) continue;
-        var record = globalData[dateStr];
-        if (!record || !Array.isArray(record.entries) || record.entries.length === 0) continue;
-        var date = parseDateKey(dateStr);
-        if (date.getFullYear() === year && date.getMonth() + 1 === month) return true;
-      }
-      return false;
-    }
-
-    function setCalculationLoading(isLoading) {
-      document.getElementById('calculateButton').disabled = isLoading;
-      if (!isLoading) return;
-      ['statDays', 'statHours'].forEach(function(id) {
-        var el = document.getElementById(id);
-        cancelAnimationFrame(el.countFrame);
-        el.textContent = '…';
-      });
-    }
-
-    function requireData() {
-      if (loadingData) { alert('文件正在加载，请稍后再试'); return false; }
-      if (!dataLoaded) { alert('请先选择并加载一个 JSON 文件'); return false; }
-      return true;
-    }
-
-    function resetResults() {
-      calculationRunVersion++;
-      setCalculationLoading(false);
-      document.getElementById('result').innerHTML = '';
-      ['statDays', 'statHours'].forEach(function(id) {
-        var el = document.getElementById(id);
-        cancelAnimationFrame(el.countFrame);
-        el.textContent = '—';
-      });
-    }
-
-    // ============================================================
-    // Phase 3: Drop Zone Setup
-    // ============================================================
-    (function setupDropZone() {
-      const dropZone = document.getElementById('dropZone');
-
-      ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(function(ev) {
-        dropZone.addEventListener(ev, function(e) { e.preventDefault(); e.stopPropagation(); });
-      });
-
-      ['dragenter', 'dragover'].forEach(function(ev) {
-        dropZone.addEventListener(ev, function() { dropZone.classList.add('dragover'); });
-      });
-
-      ['dragleave', 'drop'].forEach(function(ev) {
-        dropZone.addEventListener(ev, function() { dropZone.classList.remove('dragover'); });
-      });
-
-      dropZone.addEventListener('drop', function(e) {
-        var files = e.dataTransfer.files;
-        if (files.length > 0) {
-          loadDataToMemory(files[0]);
-        }
-      });
-    })();
-
-    // ============================================================
-    // Phase 6: Editor Overlay Setup
-    // ============================================================
-    // backdrop 点击关闭（打开动画期间不响应，防误触）
-    document.getElementById('editorBackdrop').addEventListener('click', function() {
-      if (Date.now() - editorOpenedAt < 400) return;
-      closeEditorOverlay();
-    });
-    document.getElementById('deleteBackdrop').addEventListener('click', closeDeletePicker);
-
-    // Swipe-down-to-close gesture —— 只在面板顶部把手区生效，避免误触输入框/按钮
-    (function setupEditorSwipe() {
-      var overlay = document.getElementById('editorOverlay');
-      var panel = document.getElementById('editorPanel');
-      var startY = 0, currentY = 0, dragging = false;
-      var DRAG_START = 12;   // 位移超过该值才判定为“下拉”（而非点击）
-      var DRAG_CLOSE = 140;  // 位移超过该值才关闭编辑器
-      var HANDLE_ZONE = 48;  // 面板顶部把手区高度（px），仅此处可触发下拉关闭
-
-      // 触摸目标位于交互元素上，或不在顶部把手区，则不启用下拉手势
-      function inHandleZone(e) {
-        var t = e.target;
-        if (t && t.closest && t.closest('input, button, a, select, label, textarea, table')) return false;
-        var rect = panel.getBoundingClientRect();
-        return (e.touches[0].clientY - rect.top) <= HANDLE_ZONE;
-      }
-
-      panel.addEventListener('touchstart', function(e) {
-        if (!overlay.classList.contains('active')) return;
-        if (panel.scrollTop > 0) return;          // 内容已向下滚动时不响应
-        if (!inHandleZone(e)) return;
-        startY = e.touches[0].clientY;
-        dragging = false;
-      }, { passive: true });
-
-      panel.addEventListener('touchmove', function(e) {
-        if (startY === 0) return;
-        var delta = e.touches[0].clientY - startY;
-        if (delta <= 0) {                         // 向上滑：取消拖动
-          if (dragging) {
-            dragging = false;
-            panel.style.transform = '';
-            panel.style.transition = '';
-          }
-          return;
-        }
-        if (!dragging && delta > DRAG_START) {
-          dragging = true;
-          panel.style.transition = 'none';
-        }
-        if (dragging) {
-          currentY = e.touches[0].clientY;
-          panel.style.transform = 'translateY(' + (currentY - startY) * 0.5 + 'px)'; // 带阻尼
-        }
-      }, { passive: true });
-
-      panel.addEventListener('touchend', function() {
-        if (startY === 0) return;
-        if (dragging) {
-          var dy = currentY - startY;
-          panel.style.transition = '';
-          panel.style.transform = '';
-          if (dy > DRAG_CLOSE) closeEditorOverlay();
-        }
-        startY = 0; dragging = false;
-      });
-    })();
-
-    // Escape key to close
-    document.addEventListener('keydown', function(e) {
-      if (e.key !== 'Escape') return;
-      if (document.getElementById('deleteOverlay').classList.contains('active')) closeDeletePicker();
-      else closeEditorOverlay();
-    });
-
-    function editorMonthRange(now) {
-      return {
-        min: localDateKey(new Date(now.getFullYear(), now.getMonth(), 1)),
-        max: localDateKey(new Date(now.getFullYear(), now.getMonth() + 1, 0))
-      };
-    }
-
-    function updateEditorDateRange(now, resetDate) {
-      var input = document.getElementById('newDate');
-      var range = editorMonthRange(now);
-      input.min = range.min;
-      input.max = range.max;
-      if (resetDate || input.value < range.min || input.value > range.max) input.value = localDateKey(now);
-      return range;
-    }
-
-    function openEditorOverlay() {
-      if (!requireData()) return;
-      var now = new Date();
-      updateEditorDateRange(now, true);
-      document.getElementById('newTime').value = now.toTimeString().slice(0, 5);
-      renderEditorTable();
-      editorOpenedAt = Date.now();
-      document.getElementById('editorOverlay').classList.add('active');
-      document.body.style.overflow = 'hidden';
-    }
-
-    function closeEditorOverlay() {
-      closeDeletePicker();
-      document.getElementById('editorOverlay').classList.remove('active');
-      document.body.style.overflow = '';
-      var panel = document.getElementById('editorPanel');
-      panel.style.transform = '';
-      panel.style.transition = '';
-    }
-
-    // ============================================================
-    // File handling
-    // ============================================================
-    function handleFileSelect() {
-      var file = document.getElementById('fileInput').files[0];
-      // Cancelling the picker leaves the currently loaded data intact.
-      if (file) return loadDataToMemory(file);
-    }
-
-    async function loadDataToMemory(file) {
-      var version = ++loadVersion;
-      loadingData = true;
-      dataLoaded = false;
-      globalData = {};
-      closeEditorOverlay();
-      resetResults();
-      document.getElementById('fileName').textContent = '正在加载：' + file.name;
-      document.getElementById('fileName').classList.remove('is-empty');
-      document.getElementById('dropZone').classList.remove('has-file');
-      document.getElementById('statFile').textContent = '未加载文件';
-      document.getElementById('fileBar').classList.add('is-empty');
-      try {
-        if (file.size > MAX_FILE_BYTES) throw new Error('文件超过 8 MB，请拆分后导入');
-        var text = await file.text();
-        // A slower earlier selection must never replace a newer file.
-        if (version !== loadVersion) return false;
-        if (text.length > MAX_FILE_BYTES) throw new Error('文件超过 8 MB，请拆分后导入');
-        var data = normalizeData(JSON.parse(text.replace(/^\uFEFF/, '')));
-        globalData = data;
-        currentFileName = file.name;
-        dataLoaded = true;
-        document.getElementById('fileName').textContent = '已加载：' + currentFileName;
-        document.getElementById('dropZone').classList.add('has-file');
-        document.getElementById('dropZoneLoadedName').textContent = currentFileName;
-        document.getElementById('statFile').textContent = currentFileName;
-        document.getElementById('fileBar').classList.remove('is-empty');
-        return true;
-      } catch (err) {
-        if (version !== loadVersion) return false;
-        document.getElementById('fileName').textContent = '加载失败：' + file.name;
-        alert('文件加载失败：' + err.message);
-        return false;
-      } finally {
-        if (version === loadVersion) {
-          loadingData = false;
-          // Allow selecting the same file again after fixing its contents.
-          document.getElementById('fileInput').value = '';
-        }
-      }
-    }
-
-    // ============================================================
-    // Phase 4: Stats & CountUp Animation
-    // ============================================================
-    function shouldAnimate() {
-      return !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    }
-
-    function animateCountUp(el, target, duration, decimals, suffix) {
-      cancelAnimationFrame(el.countFrame);
-      decimals = (decimals === undefined) ? 0 : decimals;
-      suffix = suffix || '';
-      if (!shouldAnimate()) {
-        el.textContent = (decimals > 0 ? target.toFixed(decimals) : Math.round(target)) + suffix;
-        return;
-      }
-      var start = performance.now();
-      function update(now) {
-        var elapsed = now - start;
-        var progress = Math.min(elapsed / duration, 1);
-        var eased = 1 - Math.pow(1 - progress, 3); // easeOutCubic
-        var current = eased * target;
-        el.textContent = (decimals > 0 ? current.toFixed(decimals) : Math.round(current)) + suffix;
-        if (progress < 1) el.countFrame = requestAnimationFrame(update);
-      }
-      el.countFrame = requestAnimationFrame(update);
-    }
-
-    function updateStats(daysCount, totalHours) {
-      animateCountUp(document.getElementById('statDays'), daysCount, 700, 0, '');
-      animateCountUp(document.getElementById('statHours'), totalHours, 900, 1, '');
-    }
-
-    // ============================================================
-    // Editor Table
-    // ============================================================
-    function renderEditorTable() {
-      var tbody = document.getElementById('tableBody');
-      tbody.innerHTML = '';
-
-      var now = new Date();
-      var currentYear = now.getFullYear();
-      var currentMonth = now.getMonth() + 1;
-      var weekdayNames = ["周日","周一","周二","周三","周四","周五","周六"];
-
-      var rows = [];
-      for (var dateStr in globalData) {
-        if (!globalData.hasOwnProperty(dateStr)) continue;
-        var value = globalData[dateStr];
-        if (!value || !value.entries || value.entries.length === 0) continue;
-        var d = parseDateKey(dateStr);
-        if (d.getFullYear() !== currentYear || d.getMonth() + 1 !== currentMonth) continue;
-
-        var entries = Array.isArray(value.entries) ? value.entries.slice() : [value.entries];
-        entries.sort(function(a,b) { return new Date(a) - new Date(b); });
-
-        var timeStrings = entries.map(function(ts) {
-          return new Date(ts).toTimeString().slice(0, 5);
-        });
-
-        rows.push({
-          dateStr: dateStr,
-          weekday: weekdayNames[d.getDay()],
-          times: timeStrings.join(", "),
-          originalDate: d
-        });
-      }
-
-      rows.sort(function(a,b) { return a.originalDate - b.originalDate; });
-
-      if (rows.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:var(--text-muted);padding:24px;">本月无记录</td></tr>';
-        return;
-      }
-
-      rows.forEach(function(row) {
-        var tr = document.createElement('tr');
-        tr.innerHTML =
-          '<td><strong>' + row.dateStr.slice(5) + '</strong><br><span class="weekday-tag">' + row.weekday + '</span></td>' +
-          '<td>' + row.times + '</td>' +
-          '<td><button class="btn btn-danger" onclick="openDeletePicker(\'' + row.dateStr + '\')">删除</button></td>';
-        tbody.appendChild(tr);
-      });
-    }
-
-    function openDeletePicker(dateStr) {
-      if (!requireData()) return;
-      var record = globalData[dateStr];
-      if (!record || !Array.isArray(record.entries) || record.entries.length === 0) return;
-      pendingDeleteDate = dateStr;
-      document.getElementById('deleteSubtitle').textContent = dateStr + ' · 请选择一条打卡记录';
-      document.getElementById('deleteList').innerHTML = record.entries.map(function(entry, index) {
-        var time = new Date(entry).toTimeString().slice(0, 8);
-        return '<button class="delete-option" onclick="deletePunch(' + index + ')">' +
-          '<span class="delete-option__label"><span class="delete-option__time">' + time + '</span>' +
-          '<span class="delete-option__index">第 ' + (index + 1) + ' 条</span></span>' +
-          '<span class="delete-option__action">删除</span></button>';
-      }).join('');
-      var overlay = document.getElementById('deleteOverlay');
-      overlay.classList.add('active');
-      overlay.setAttribute('aria-hidden', 'false');
-    }
-
-    function closeDeletePicker() {
-      pendingDeleteDate = null;
-      var overlay = document.getElementById('deleteOverlay');
-      overlay.classList.remove('active');
-      overlay.setAttribute('aria-hidden', 'true');
-    }
-
-    function addEntry() {
-      if (!requireData()) return;
-      var now = new Date();
-      var dateInput = document.getElementById('newDate');
-      var currentRange = editorMonthRange(now);
-      if (!dateInput.min || !dateInput.max) {
-        updateEditorDateRange(now, false);
-      } else if (dateInput.min !== currentRange.min || dateInput.max !== currentRange.max) {
-        updateEditorDateRange(now, true);
-        document.getElementById('newTime').value = now.toTimeString().slice(0, 5);
-        alert('当前月份已更新，请确认日期和时间后重新添加');
-        return;
-      }
-      var dateVal = document.getElementById('newDate').value;
-      var timeVal = document.getElementById('newTime').value;
-      if (!dateVal || !timeVal) { alert("请选择完整的日期和时间"); return; }
-
-      var newDate;
-      try {
-        var selectedDate = parseDateKey(dateVal);
-        if (selectedDate.getFullYear() !== now.getFullYear() || selectedDate.getMonth() !== now.getMonth()) {
-          throw new Error('数据编辑器仅支持添加本月打卡');
-        }
-        if (!/^\d{2}:\d{2}$/.test(timeVal)) throw new Error('请输入小时和分钟');
-        newDate = new Date(dateVal + 'T' + timeVal + ':00');
-        if (!Number.isFinite(newDate.getTime()) || localDateKey(newDate) !== dateVal ||
-            newDate.toTimeString().slice(0, 5) !== timeVal) throw new Error('无效的打卡时间');
-      } catch (err) { alert(err.message); return; }
-
-      if (!globalData[dateVal]) { globalData[dateVal] = { entries: [] }; }
-      else if (!Array.isArray(globalData[dateVal].entries)) { globalData[dateVal].entries = [globalData[dateVal].entries]; }
-
-      globalData[dateVal].entries.push(formatEntry(newDate));
-      globalData[dateVal].entries.sort(function(a,b) { return new Date(a) - new Date(b); });
-      renderEditorTable();
-      processFile();
-    }
-
-    function deletePunch(index) {
-      if (!requireData()) return;
-      var dateStr = pendingDeleteDate;
-      var record = dateStr && globalData[dateStr];
-      if (!record || !Array.isArray(record.entries) || !Number.isInteger(index) || index < 0 || index >= record.entries.length) {
-        closeDeletePicker();
-        return;
-      }
-      var time = new Date(record.entries[index]).toTimeString().slice(0, 8);
-      if (!confirm('确定要删除 ' + dateStr + ' ' + time + ' 这条打卡记录吗？')) return;
-      record.entries.splice(index, 1);
-      renderEditorTable();
-      processFile();
-      if (record.entries.length === 0) closeDeletePicker();
-      else openDeletePicker(dateStr);
-    }
-
-    function deleteDay() {
-      if (!requireData()) return;
-      var dateStr = pendingDeleteDate;
-      if (!dateStr || !globalData[dateStr]) { closeDeletePicker(); return; }
-      if (!confirm('确定要删除 ' + dateStr + ' 的所有打卡记录吗？')) return;
-      delete globalData[dateStr];
-      closeDeletePicker();
-      renderEditorTable();
-      processFile();
-    }
-
-    function saveAndDownload() {
-      if (!requireData()) return;
-      var dataStr = JSON.stringify(normalizeData(globalData), null, 2);
-      var blob = new Blob([dataStr], { type: "application/json" });
-      var url = URL.createObjectURL(blob);
-      var a = document.createElement('a');
-      a.href = url; a.download = currentFileName;
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
-      alert("文件已生成下载，请用新文件替换旧文件。");
-    }
-
-    // ============================================================
-    // Overtime Calculation + Phase 5: Day Cards
-    // ============================================================
-    function formatDuration(seconds) {
-      if (seconds <= 0) return "0小时0分钟";
-      var h = Math.floor(seconds / 3600);
-      var m = Math.floor((seconds % 3600) / 60);
-      return h + "小时" + m + "分钟";
-    }
-
-    async function processFile() {
-      if (!requireData()) return;
-
-      var runVersion = ++calculationRunVersion;
-      var fileVersion = loadVersion;
-      // A newer calculation supersedes any older pending holiday request.
-      setCalculationLoading(false);
-      var now = new Date();
-      var currentYear = now.getFullYear();
-      var currentMonth = now.getMonth() + 1;
-      var weekdayNames = ["周日","周一","周二","周三","周四","周五","周六"];
-      var totalSec = 0;
-      var details = [];
-
-      var needsHolidayData = hasCurrentMonthEntries(currentYear, currentMonth);
-      var holidayCalendar = null;
-      if (needsHolidayData) {
-        holidayCalendar = loadHolidayCalendar(currentYear);
-        if (holidayCalendar && typeof holidayCalendar.then === 'function') {
-          setCalculationLoading(true);
-          document.getElementById('result').innerHTML = '<div class="empty-state">正在加载调休数据…</div>';
-          try {
-            holidayCalendar = await holidayCalendar;
-          } finally {
-            if (runVersion === calculationRunVersion) setCalculationLoading(false);
-          }
-          if (runVersion !== calculationRunVersion || fileVersion !== loadVersion || !dataLoaded) return;
-        }
-      }
-
-      try {
-        for (var dateStr in globalData) {
-          if (!globalData.hasOwnProperty(dateStr)) continue;
-          var value = globalData[dateStr];
-          if (!value || !value.entries || value.entries.length === 0) continue;
-          var d = parseDateKey(dateStr);
-          if (d.getFullYear() !== currentYear || d.getMonth() + 1 !== currentMonth) continue;
-          var entries = Array.isArray(value.entries) ? value.entries.slice() : [value.entries];
-          var datetimes = entries.map(function(ts) { return parseEntry(ts, dateStr); }).sort(function(a,b) { return a - b; });
-
-          var holidayOverride = holidayCalendar && holidayCalendar.days[dateStr];
-          var isWeekend = d.getDay() === 0 || d.getDay() === 6;
-          var isRestDay = holidayOverride ? holidayOverride.isOffDay : isWeekend;
-          var dayType = 'workday';
-          var dayTypeLabel = '工作日';
-          if (holidayOverride) {
-            dayType = holidayOverride.isOffDay ? 'holiday' : 'adjusted';
-            dayTypeLabel = holidayOverride.isOffDay ? holidayOverride.name : '调休上班';
-          } else if (isWeekend) {
-            dayType = 'weekend';
-            dayTypeLabel = '周末';
-          }
-          var overtimeSec = 0;
-
-          if (isRestDay && datetimes.length >= 2) {
-            overtimeSec = (datetimes[datetimes.length - 1] - datetimes[0]) / 1000;
-          } else if (!isRestDay) {
-            var workEnd = new Date(d);
-            workEnd.setHours(17, 30, 0, 0);
-            var latest = datetimes[datetimes.length - 1];
-            if (latest > workEnd) overtimeSec = (latest - workEnd) / 1000;
-          }
-
-          details.push({
-            date: dateStr,
-            weekday: weekdayNames[d.getDay()],
-            dayType: dayType,
-            dayTypeLabel: dayTypeLabel,
-            times: datetimes.map(function(t) { return t.toTimeString().slice(0, 5); }).join(", "),
-            durationStr: formatDuration(overtimeSec),
-            durationSec: overtimeSec
-          });
-
-          if (overtimeSec > 0) totalSec += overtimeSec;
-        }
-
-        details.sort(function(a,b) { return new Date(a.date) - new Date(b.date); });
-
-        // Phase 5: Build individual day cards
-        var html = '<div class="section-title">' + currentYear + '年' + currentMonth + '月 加班明细</div>';
-        if (needsHolidayData && !holidayCalendar) {
-          html += '<div class="calendar-warning">调休数据暂不可用，当前结果仅按星期计算。</div>';
-        }
-
-        if (details.length === 0) {
-          html += '<div class="empty-state">本月暂无打卡记录</div>';
-        } else {
-          details.forEach(function(day, i) {
-            var hasOvertime = day.durationSec > 0;
-            var cls = 'day-card' + (hasOvertime ? ' day-card--overtime' : ' day-card--zero');
-            html +=
-              '<div class="' + cls + '" style="--i:' + i + '">' +
-                '<div class="day-card__header">' +
-                  '<span class="day-card__identity">' +
-                    '<span class="day-card__date">' + day.date + '</span>' +
-                    '<span class="day-card__weekday">' + escapeHtml(day.weekday) + '</span>' +
-                    '<span class="day-type-badge day-type-badge--' + day.dayType + '">' + escapeHtml(day.dayTypeLabel) + '</span>' +
-                  '</span>' +
-                  '<span class="day-card__duration">' + day.durationStr + '</span>' +
-                '</div>' +
-                '<div class="day-card__times">打卡时间：' + day.times + '</div>' +
-              '</div>';
-          });
-        }
-
-        if (totalSec > 0) {
-          var totalHours = (totalSec / 3600);
-          html +=
-            '<div class="total-card">' +
-              '<span class="total-card__label">总加班时长</span>' +
-              '<span class="total-card__value" id="totalValue" data-target="' + totalHours.toFixed(2) + '">0.00 小时</span>' +
-            '</div>';
-        }
-
-        document.getElementById('result').innerHTML = html;
-
-        // Trigger countUp on total
-        if (totalSec > 0) {
-          var totalEl = document.getElementById('totalValue');
-          if (totalEl) {
-            requestAnimationFrame(function() {
-              animateCountUp(totalEl, parseFloat(totalEl.getAttribute('data-target')), 1200, 2, ' 小时');
-            });
-          }
-        }
-
-        // Update stats
-        updateStats(details.length, totalSec / 3600);
-
-      } catch (err) {
-        document.getElementById('result').textContent = '处理出错：' + err.message;
-      }
-    }
-  </script>
-</body>
+    </dialog>
+    <noscript
+      ><p class="noscript-notice">
+        此工具需要启用 JavaScript 才能在本机读取和计算记录。你的文件不会上传。
+      </p></noscript
+    >
+  </body>
 </html>

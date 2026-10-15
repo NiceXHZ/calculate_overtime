@@ -25,6 +25,11 @@ desktop.ini
 *.swp
 __pycache__/
 *.pyc
+node_modules/
+/dist/
+/test-results/
+/playwright-report/
+/artifacts/
 
 # Signing identities and private configuration
 *.jks
