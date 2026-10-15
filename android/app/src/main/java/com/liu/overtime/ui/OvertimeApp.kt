@@ -4,8 +4,6 @@ package com.liu.overtime.ui
 
 import android.app.Activity
 import android.app.ActivityManager
-import android.appwidget.AppWidgetManager
-import android.content.ComponentName
 import android.content.Intent
 import android.os.Build
 import androidx.activity.compose.BackHandler
@@ -48,6 +46,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.core.view.WindowCompat
 import com.kyant.backdrop.backdrops.layerBackdrop
@@ -61,6 +60,8 @@ import com.liu.overtime.widget.*
 import java.time.*
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 private val Green = Color(0xFF227762)
 private val Mint = Color(0xFFCDF1DE)
@@ -78,6 +79,7 @@ fun OvertimeApp(vm: MainViewModel = viewModel(), todayRequest: Int = 0) {
     val todayCalendar by vm.todayCalendar.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
     val refreshing by vm.refreshing.collectAsStateWithLifecycle()
+    val pinState by vm.widgetPin.state.collectAsStateWithLifecycle()
     val dark = prefs.dark == "dark" || (prefs.dark == "system" && isSystemInDarkTheme())
     val colors = overtimeColorScheme(dark)
     MaterialTheme(colorScheme = colors, typography = Typography()) {
@@ -87,13 +89,32 @@ fun OvertimeApp(vm: MainViewModel = viewModel(), todayRequest: Int = 0) {
         var deleting by remember { mutableStateOf<Triple<LocalDate, Int, Instant>?>(null) }
         var recovering by remember { mutableStateOf(false) }
         var choosingCutoff by rememberSaveable { mutableStateOf(false) }
-        val modalVisible = adding || selected != null || deleting != null || recovering || choosingCutoff
+        val otherModalVisible = adding || selected != null || deleting != null || recovering || choosingCutoff
+        val pinHelpVisible = !otherModalVisible && pinState.outcome in setOf(PinOutcome.UNCONFIRMED, PinOutcome.UNAVAILABLE)
+        val modalVisible = otherModalVisible || pinHelpVisible
         LaunchedEffect(todayRequest) {
             if (todayRequest > 0) {
                 tab = 0; adding = false; selected = null; deleting = null; recovering = false; choosingCutoff = false
             }
         }
         val snackbar = remember { SnackbarHostState() }
+        val scope = rememberCoroutineScope()
+        LifecycleResumeEffect(pinState.request?.token, pinState.outcome, otherModalVisible) {
+            val job = if (!otherModalVisible) scope.launch {
+                if (pinState.outcome == PinOutcome.CONFIRMED) {
+                    vm.widgetPin.dismiss()
+                    scope.launch { snackbar.showSnackbar("${pinState.size} 小组件已添加到桌面") }
+                } else if (pinState.request != null) {
+                    vm.widgetPin.reconcile()
+                    if (vm.widgetPin.state.value.outcome == PinOutcome.PENDING) {
+                        // Give the returning launcher's callback a short grace period before showing help.
+                        delay(maxOf(600L, vm.widgetPin.remainingWaitMillis()))
+                        vm.widgetPin.reconcile(promptIfUnknown = true)
+                    }
+                }
+            } else null
+            onPauseOrDispose { job?.cancel() }
+        }
         val context = LocalContext.current
         val lowRam = remember(context) { context.getSystemService(ActivityManager::class.java).isLowRamDevice }
         SideEffect {
@@ -251,21 +272,18 @@ fun OvertimeApp(vm: MainViewModel = viewModel(), todayRequest: Int = 0) {
                             item { GlassCard {
                                 Text("桌面上的小帮手", fontWeight = FontWeight.SemiBold)
                                 Text("每种尺寸都以大按钮打卡和今日记录为主。\n小尺寸看最近记录，大尺寸看今日时间线；点按记录可查看今日全部打卡。\n长按桌面 → 小组件 → 加班打卡。", fontSize = 13.sp, lineHeight = 21.sp, color = colors.onSurfaceVariant, modifier = Modifier.padding(vertical = 12.dp))
-                                run {
-                                    val manager = AppWidgetManager.getInstance(context)
-                                    if (manager.isRequestPinAppWidgetSupported) {
-                                        val widgets = listOf("2×1" to QuickAttendanceWidget::class.java, "2×2" to SmallAttendanceWidget::class.java,
-                                            "3×2" to TodayAttendanceWidget::class.java, "4×1" to StripAttendanceWidget::class.java,
-                                            "4×2" to MediumAttendanceWidget::class.java, "4×3" to LargeAttendanceWidget::class.java)
-                                        widgets.chunked(3).forEach { row ->
-                                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                                row.forEach { (label, type) ->
-                                                    OutlinedButton(modifier = Modifier.weight(1f), onClick = { manager.requestPinAppWidget(ComponentName(context, type), null, null) }) { Text(label) }
-                                                }
-                                            }
+                                val widgets = listOf("2×1" to QuickAttendanceWidget::class.java, "2×2" to SmallAttendanceWidget::class.java,
+                                    "3×2" to TodayAttendanceWidget::class.java, "4×1" to StripAttendanceWidget::class.java,
+                                    "4×2" to MediumAttendanceWidget::class.java, "4×3" to LargeAttendanceWidget::class.java)
+                                widgets.chunked(3).forEach { row ->
+                                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        row.forEach { (label, type) ->
+                                            OutlinedButton(modifier = Modifier.weight(1f), enabled = pinState.outcome != PinOutcome.PENDING,
+                                                onClick = { vm.widgetPin.request(type, label) }) { Text(label) }
                                         }
                                     }
                                 }
+                                if (pinState.outcome == PinOutcome.PENDING) Text("等待桌面确认…", fontSize = 12.sp, color = colors.onSurfaceVariant)
                                 Text("也可在系统快捷设置中添加「打卡」磁贴。", fontSize = 12.sp, color = colors.onSurfaceVariant)
                             } }
                             item { Hint("加班打卡 ${BuildConfig.VERSION_NAME}", "所有记录保存在本机，北京时间。联网仅用于获取公开节假日。卸载会清除本地数据，请先导出备份。", Icons.Outlined.FavoriteBorder) }
@@ -298,6 +316,7 @@ fun OvertimeApp(vm: MainViewModel = viewModel(), todayRequest: Int = 0) {
             }
             val glass = prefs.glass && !lowRam
             when {
+                pinHelpVisible -> WidgetPinHelpSheet(pinState, backdrop, glass, onDismiss = vm.widgetPin::dismiss)
                 deleting != null -> {
                     val (date, index, instant) = deleting!!
                     GlassConfirmation("删除这次打卡？", "将移除 $date 的第 ${index + 1} 次打卡。修改前副本会保留在本机。",

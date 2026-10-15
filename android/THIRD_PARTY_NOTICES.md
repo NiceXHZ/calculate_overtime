@@ -34,3 +34,7 @@ Copyright (c) 2019 NateScarlet. 使用 MIT License，全文见 [MIT](licenses/ho
 ## 滚轮刻度音效
 
 `picker_tick.wav` 为本项目生成的原创短音，无外部音频素材，随项目采用 GPL-3.0。
+
+## 小米官方安卓小部件入口图
+
+`app/src/main/assets/guides/xiaomi-native-widgets.webp` 来自用户提供的小米官方流程截图，与[小米开发者文档](https://dev.mi.com/xiaomihyperos/documentation/detail?pId=1588)中的「安卓小部件入口」图一致，仅无损转为 WebP，内容未修改，用于说明原生组件的手动添加路径。图片及其中的品牌标识归原权利人所有，不属于本项目原创 GPL-3.0 素材。

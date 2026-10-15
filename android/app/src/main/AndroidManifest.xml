@@ -33,6 +33,7 @@
         <receiver android:name=".widget.PunchReceiver" android:exported="false">
             <intent-filter><action android:name="com.liu.overtime.PUNCH" /></intent-filter>
         </receiver>
+        <receiver android:name=".widget.WidgetPinSuccessReceiver" android:exported="false" />
         <receiver android:name=".widget.ClockChangeReceiver" android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.DATE_CHANGED" />

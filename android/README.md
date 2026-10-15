@@ -1,6 +1,6 @@
 # 加班打卡 · Android
 
-当前版本 **0.3.2**（versionCode 7）。使用 Kotlin + Jetpack Compose，最低支持 Android 8.0（API 26），目标 Android 16（API 36）。应用与网页共用仓库，通过 JSON 文件互相导入导出。
+当前版本 **0.3.3**（versionCode 8）。使用 Kotlin + Jetpack Compose，最低支持 Android 8.0（API 26），目标 Android 16（API 36）。应用与网页共用仓库，通过 JSON 文件互相导入导出。
 
 [下载安装](#从-releases-下载安装) · [开始使用](#开始使用) · [桌面组件](#桌面组件与快捷磁贴) · [备份与计算](#数据备份与计算) · [源码构建](#从源码构建)
 
@@ -9,7 +9,7 @@
 日常使用可直接安装正式 APK，无需 Android Studio、JDK 或源码构建环境。
 
 1. 打开 [GitHub Releases](https://github.com/NiceXHZ/calculate_overtime/releases)，进入最新正式版本。
-2. 在 **Assets** 中下载 `.apk` 正式安装包，例如 `overtime-checkin-0.3.2-arm64-v8a.apk`。`Source code (zip / tar.gz)` 为源码归档，不是安装包。
+2. 在 **Assets** 中下载 `.apk` 正式安装包，例如 `overtime-checkin-0.3.3-arm64-v8a.apk`。`Source code (zip / tar.gz)` 为源码归档，不是安装包。
 3. 在 Android 手机上打开 APK，按系统提示授予当前浏览器或文件管理器安装权限，再完成安装。
 4. 打开「加班打卡」，直接记录出勤，之后可添加桌面组件。
 
@@ -64,6 +64,8 @@
 | 4×3 | 更多今日记录与打卡按钮 |
 
 在桌面长按添加小组件，选择「加班打卡」。支持调整大小，六种规格会根据实际空间切换排版；不同桌面的实际格子大小可能不同。设置页也可在桌面支持时请求添加指定规格。
+
+从设置请求添加后，应用会根据桌面成功回调或新增的组件 ID 确认结果；若桌面明确不支持，会直接提示手动添加。请求发出约 6 秒仍未确认时，仅在应用处于前台且没有其他弹层时展示「尚未确认添加成功」，不会把取消操作判为失败。小米、Redmi 和 POCO 手机的提示中附有小米官方添加流程图，可离线打开、缩放和拖动查看。
 
 - **只有打卡按钮保存记录**，点击时间或记录区域进入应用「今天」页。
 - 最近时间优先显示，常规尺寸单独显示秒数，较早记录按最近优先排列；空间不足时减少记录数量，保留清晰的时间与按钮。点按记录可查看今日全部打卡。
@@ -178,13 +180,14 @@ node --test tests/overtime.test.cjs
 - 空记录、单条、多条和读取失败状态，Android 9 兼容布局；
 - 时间基线、文字对比度、按钮边界和点击目标；
 - 日期页窄屏、横屏及 1.6 倍字体的单行和溢出检查，月末与闰年日期修正。
+- 组件添加请求的成功、拒绝、无回调、已有组件、迟到回调与进程恢复，以及官方流程图在深浅色、窄屏、横屏和大字体下的可用性。
 
 测试报告位于 `app/build/reports/`，截图位于 `app/build/screenshots/`。JVM 截图关闭 GPU 玻璃效果；真实设备上的 GPU 动画、音效、震感、锁屏与桌面行为按 [设备验收清单](docs/DEVICE_CHECKLIST.md)检查。
 
 ```text
 app/src/main/java/         界面、计算、存储、组件和快捷磁贴
 app/src/main/res/          图标、组件布局、主题和滚轮音效
-app/src/main/assets/       内置节假日数据和许可
+app/src/main/assets/       内置节假日、离线组件指引和许可
 app/src/test/              单元测试、交互与排版回归
 scripts/                   本地签名工具
 licenses/                  第三方许可全文

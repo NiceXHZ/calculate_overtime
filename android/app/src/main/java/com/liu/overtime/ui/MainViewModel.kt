@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.liu.overtime.data.*
 import com.liu.overtime.domain.*
 import com.liu.overtime.widget.AttendanceWidget
+import com.liu.overtime.widget.WidgetPinRequests
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.sync.Mutex
@@ -28,6 +29,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val context: Application = application
     val store = RecordStore.get(context)
     val state = store.state
+    val widgetPin = WidgetPinRequests.get(context)
     private val shared = context.getSharedPreferences("preferences", 0)
     private val mutablePrefs = MutableStateFlow(Preferences(
         runCatching { LocalTime.parse(shared.getString("cutoff", "17:30")) }.getOrDefault(LocalTime.of(17,30)),
