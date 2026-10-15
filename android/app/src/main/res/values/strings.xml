@@ -1,0 +1,32 @@
+<resources>
+<string name="app_name">加班打卡</string>
+<string name="widget_quick">2×1 · 一键打卡</string>
+<string name="widget_small">2×2 · 今日打卡</string>
+<string name="widget_today">3×2 · 今日记录</string>
+<string name="widget_strip">4×1 · 记录与打卡</string>
+<string name="widget_medium">4×2 · 今日打卡</string>
+<string name="widget_large">4×3 · 今日时间线</string>
+<string name="widget_description">大按钮一键打卡，直接查看今日打卡时间，支持调整大小。</string>
+<string name="widget_punch">打卡</string>
+<string name="widget_punch_description">记录当前时间打卡</string>
+<string name="widget_today_heading">今日打卡</string>
+<string name="widget_date_preview">10/15 周四</string>
+<string name="widget_empty">今日尚未打卡</string>
+<string name="widget_empty_short">未打卡</string>
+<string name="widget_count_preview">0 次打卡</string>
+<string name="widget_total_preview">0.0 h</string>
+<string name="widget_month_preview">本月 0.0 h</string>
+<string name="widget_first_preview">首次 — —</string>
+<string name="widget_last_preview">最近 — —</string>
+<string name="widget_time_preview">— —</string>
+<string name="widget_first_label">首次打卡</string>
+<string name="widget_last_label">最近打卡</string>
+<string name="widget_month_label">本月加班</string>
+<string name="widget_history_preview">今日时间线\n尚无记录，轻点下方打卡</string>
+<string name="widget_calendar_preview">按节假日与调休计算</string>
+<string name="widget_square_count_preview">0 次</string>
+<string name="widget_records_heading">今日记录</string>
+<string name="widget_recent_heading">最近打卡</string>
+<string name="widget_records_preview">尚未打卡</string>
+<string name="widget_seconds_preview">:00</string>
+</resources>

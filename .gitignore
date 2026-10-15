@@ -1,0 +1,47 @@
+# Local Android / Gradle state
+.gradle/
+.kotlin/
+**/build/
+local.properties
+.cxx/
+.externalNativeBuild/
+captures/
+
+# Editors and operating systems
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Generated packages, diagnostics, and temporary files
+*.apk
+*.aab
+*.apks
+*.hprof
+*.log
+*.tmp
+*.swp
+__pycache__/
+*.pyc
+
+# Signing identities and private configuration
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pem
+*.key
+*signing*.properties
+keystore.properties
+.env
+.env.*
+!.env.example
+
+# Personal attendance records and exported reports; keep the public example
+overtime_log*.json
+!overtime_log.example.json
+overtime-*.csv
+/attendance/
+/backups/
