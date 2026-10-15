@@ -10,7 +10,7 @@
 | 网页工具 | [在线使用](https://calculate-overtime.vercel.app/) | 现代浏览器，无需安装 |
 | iOS 快捷指令 | [安装打卡快捷指令](https://www.icloud.com/shortcuts/1d4ad7c1eae14dbb964682359b14b8fc) | 运行后将记录文件导入网页 |
 
-当前 Android 源码版本为 **0.3.1**。安装包以 Releases 中实际发布的版本和附件为准；发布页暂无 APK 时，可等待发布或[自行构建](android/README.md#从源码构建)。
+当前 Android 源码版本为 **0.3.2**。安装包以 Releases 中实际发布的版本和附件为准；发布页暂无 APK 时，可等待发布或[自行构建](android/README.md#从源码构建)。
 
 [下载与安装](#下载与安装) · [主要功能](#主要功能) · [开始使用](#开始使用) · [计算与数据](#计算与数据) · [开发与验证](#开发与验证)
 
@@ -19,7 +19,8 @@
 ### Android
 
 1. 打开 [Releases 发布页](https://github.com/NiceXHZ/calculate_overtime/releases)，选择最新正式版本。
-2. 展开该版本的 **Assets**，下载以 `.apk` 结尾的正式安装包，例如 `加班打卡-0.3.1.apk` 或 `app-release.apk`。`Source code (zip)` 和 `Source code (tar.gz)` 是源码，不能直接安装到手机。
+2. 展开该版本的 **Assets**，下载以 `.apk` 结尾的正式安装包，例如 `overtime-checkin-0.3.2-arm64-v8a.apk`。`Source code (zip)` 和 `Source code (tar.gz)` 是源码，不能直接安装到手机。
+   常见手机选 `arm64-v8a`；模拟器按其 Android 系统架构选 `x86_64` / `x86`；不确定时选 `universal`。每个 APK 都可单独安装，详细对照见 [安装包平台](android/README.md#安装包平台)。
 3. 在手机打开 APK。若系统提示安装权限，按提示允许当前浏览器或文件管理器安装此应用，再完成安装。
 4. 打开「加班打卡」，即可直接记录，无需先创建文件或注册账号。
 
@@ -91,7 +92,7 @@ Android 配置 JDK 21 与 Android SDK 36 后，在仓库根目录执行：
 ./android/gradlew -p android :app:assembleDebug :app:testDebugUnitTest :app:lintDebug
 ```
 
-签名、正式包构建与输出位置见 [Android 构建说明](android/README.md#从源码构建)，设备检查项见 [验收清单](android/docs/DEVICE_CHECKLIST.md)。0.3.1 已通过 **26 项网页测试、29 项 Android 测试**，Android Lint 无错误；真实设备上的 GPU 效果、触感与桌面行为仍需设备检查。
+签名、正式包构建与输出位置见 [Android 构建说明](android/README.md#从源码构建)，设备检查项见 [验收清单](android/docs/DEVICE_CHECKLIST.md)。自动化检查结果见 [代码与构建复查记录](android/docs/CODE_REVIEW.md)，覆盖网页、Android 逻辑与界面；真实设备上的 GPU 效果、触感与桌面行为仍需设备检查。
 
 ```text
 index.html                 网页界面、样式与业务逻辑

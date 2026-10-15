@@ -154,6 +154,42 @@ class AppInteractionTest {
         compose.onNodeWithText("记录打卡").assertIsDisplayed()
     }
 
+    @Test fun thousandsOfPunchesRemainLazyAndCanScrollToTheLastRecord() {
+        val store = RecordStore.get(compose.activity)
+        compose.waitUntil(15_000) { store.state.value.loaded }
+        val vm = androidx.lifecycle.ViewModelProvider(compose.activity)[com.liu.overtime.ui.MainViewModel::class.java]
+        compose.runOnIdle { vm.updatePreferences(com.liu.overtime.ui.Preferences(glass = false)) }
+        val date = java.time.LocalDate.now(com.liu.overtime.domain.WorkZone)
+        val start = date.atStartOfDay(com.liu.overtime.domain.WorkZone).toInstant()
+        store.import(com.liu.overtime.domain.RecordCodec.encode(listOf(com.liu.overtime.domain.DayRecord(date, (0 until 1000).map { start.plusSeconds(it.toLong()) }))))
+        compose.onNodeWithTag("main-page").performScrollToNode(hasTestTag("today-punch-list"))
+        assertTrue(compose.onAllNodes(hasContentDescription("删除第", substring = true)).fetchSemanticsNodes().size < 30)
+        compose.onNodeWithTag("today-punch-list").performScrollToNode(hasContentDescription("删除第 1000 次打卡"))
+        compose.onNodeWithContentDescription("删除第 1000 次打卡").assertIsDisplayed()
+        compose.onNodeWithText("记录").performClick()
+        val dayLabel = date.format(java.time.format.DateTimeFormatter.ofPattern("M月d日 EEEE", java.util.Locale.CHINA))
+        compose.waitUntil(10_000) { compose.onAllNodesWithText(dayLabel).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText(dayLabel).performClick()
+        compose.onNodeWithTag("sheet-record-list").performScrollToNode(hasContentDescription("删除第 1000 次打卡"))
+        compose.onNodeWithContentDescription("删除第 1000 次打卡").assertIsDisplayed()
+        assertTrue(compose.onAllNodes(hasContentDescription("删除第", substring = true)).fetchSemanticsNodes().size < 30)
+    }
+
+    @Test fun csvExportKeepsRequestedMonthEvenWhenTheSelectedMonthChanges() {
+        val store = RecordStore.get(compose.activity)
+        compose.waitUntil(15_000) { store.state.value.loaded }
+        store.import("""{"2026-09-10":{"entries":"2026-09-10T19:00:00+08:00"},"2026-10-01":{"entries":"2026-10-01T18:00:00+08:00"}}""")
+        val vm = androidx.lifecycle.ViewModelProvider(compose.activity)[com.liu.overtime.ui.MainViewModel::class.java]
+        val output = File(compose.activity.cacheDir, "month-snapshot.csv")
+        compose.runOnIdle {
+            vm.month.value = java.time.YearMonth.of(2026, 10)
+            vm.export(android.net.Uri.fromFile(output), csv = true, exportMonth = java.time.YearMonth.of(2026, 9))
+        }
+        compose.waitUntil(10_000) { output.exists() && output.readText().contains("2026-09-10") }
+        assertFalse(output.readText().contains("2026-10-01"))
+        assertTrue(output.readText().contains("5400"))
+    }
+
     private fun capture(name: String) {
         compose.waitForIdle()
         val bitmap = compose.runOnIdle {

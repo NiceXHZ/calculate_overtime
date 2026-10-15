@@ -100,4 +100,102 @@ class RecordStoreTest {
         assertTrue(fresh.state.value.records.sumOf { it.punches.size } > 0)
         assertTrue(File(context.filesDir, "attendance").listFiles()!!.any { it.name.startsWith("damaged-") && it.readText() == "damaged original" })
     }
+
+    @Test fun midnightGuardAndOutOfOrderPunchesCannotBypassProtection() {
+        val store = RecordStore.get(RuntimeEnvironment.getApplication())
+        val midnight = Instant.parse("2026-10-14T16:00:00Z")
+        assertTrue(store.punch(midnight.minusMillis(1000)).added)
+        assertFalse(store.punch(midnight.plusMillis(1000)).added)
+        assertTrue(store.punch(midnight.plusMillis(2000)).added)
+        store.punch(midnight.plusSeconds(3600), guard = false)
+        assertFalse(store.punch(midnight.plusMillis(2001)).added)
+        assertFalse(store.punch(midnight.minusMillis(1500)).added)
+    }
+
+    @Test fun staleDeleteDoesNotRemoveTheWrongPunch() {
+        val store = RecordStore.get(RuntimeEnvironment.getApplication())
+        val expected = Instant.parse("2026-10-15T10:00:00Z")
+        store.punch(expected, guard = false)
+        store.punch(expected.minusSeconds(100), guard = false)
+        val before = store.export()
+        assertTrue(runCatching { store.remove(expected.atZone(WorkZone).toLocalDate(), 0, expected) }.isFailure)
+        assertEquals(before, store.export())
+    }
+
+    @Test fun noOpImportDoesNotRotateBackupsAndRecoveryCanBeUndone() {
+        val context = RuntimeEnvironment.getApplication() as Context
+        val store = RecordStore.get(context)
+        val start = Instant.parse("2026-10-15T01:00:00Z")
+        store.punch(start, guard = false)
+        val history = File(context.filesDir, "attendance/history")
+        val snapshots = history.listFiles()!!.map { it.name }.sorted()
+        assertEquals(0, store.import(store.export()))
+        assertEquals(snapshots, history.listFiles()!!.map { it.name }.sorted())
+        store.punch(start.plusSeconds(3600), guard = false)
+        val current = store.export()
+        store.recoverLatest()
+        assertEquals(1, store.state.value.records.single().punches.size)
+        store.recoverLatest()
+        assertEquals(current, store.export())
+        assertFalse(File(context.filesDir, "attendance").listFiles()!!.any { it.name.startsWith("damaged-") })
+    }
+
+    @Test fun incompleteOrCorruptSnapshotsAreSkippedAndRetentionIsBounded() {
+        val context = RuntimeEnvironment.getApplication() as Context
+        val store = RecordStore.get(context)
+        val start = Instant.parse("2026-10-15T01:00:00Z")
+        repeat(15) { store.punch(start.plusSeconds(it * 10L), guard = false) }
+        val history = File(context.filesDir, "attendance/history")
+        assertEquals(10, history.listFiles()!!.count { it.extension == "json" })
+        File(history, "9999999999999-partial.json.pending").writeText("{}");
+        File(history, "9999999999998-corrupt.json").writeText("broken")
+        store.recoverLatest()
+        assertEquals(14, store.state.value.records.single().punches.size)
+    }
+
+    @Test fun concurrentSourcesSaveExactlyOnceWithinTheGuard() {
+        val store = RecordStore.get(RuntimeEnvironment.getApplication())
+        val instant = Instant.parse("2026-10-15T01:00:00Z")
+        val executor = java.util.concurrent.Executors.newFixedThreadPool(4)
+        try {
+            val results = executor.invokeAll((1..12).map { java.util.concurrent.Callable { store.punch(instant).added } }).map { it.get() }
+            assertEquals(1, results.count { it })
+            assertEquals(1, store.state.value.records.single().punches.size)
+        } finally { executor.shutdownNow() }
+    }
+
+    @Test fun failedAtomicWritePreservesRecordsAndDoesNotFillHistory() {
+        val context = RuntimeEnvironment.getApplication() as Context
+        val store = RecordStore.get(context)
+        val start = Instant.parse("2026-10-15T01:00:00Z")
+        store.punch(start, guard = false)
+        val before = store.export()
+        val primary = File(context.filesDir, "attendance/overtime_log.json")
+        val history = File(context.filesDir, "attendance/history")
+        val snapshots = history.listFiles()!!.map { it.name }.sorted()
+        val blocked = File(primary.path + ".new")
+        assertTrue(blocked.mkdir())
+        try {
+            repeat(12) { assertTrue(runCatching { store.punch(start.plusSeconds(10), guard = false) }.isFailure) }
+            assertEquals(before, store.export())
+            assertEquals(before, primary.readText())
+            assertEquals(snapshots, history.listFiles()!!.map { it.name }.sorted())
+        } finally { blocked.deleteRecursively() }
+        assertTrue(store.punch(start.plusSeconds(10), guard = false).added)
+    }
+
+    @Test fun staleUndoCannotDeleteAnOriginalDuplicateAfterLaterEdits() {
+        val store = RecordStore.get(RuntimeEnvironment.getApplication())
+        val instant = Instant.parse("2026-10-15T01:00:00Z")
+        store.punch(instant, guard = false)
+        val added = store.punch(instant, guard = false)
+        store.remove(instant.atZone(WorkZone).toLocalDate(), 1, instant)
+        val before = store.export()
+        assertTrue(runCatching { store.undoPunch(instant, added.revision) }.isFailure)
+        assertEquals(before, store.export())
+        val next = store.punch(instant.plusSeconds(3600), guard = false)
+        assertEquals(0, store.import(store.export()))
+        store.undoPunch(next.instant, next.revision)
+        assertEquals(before, store.export())
+    }
 }

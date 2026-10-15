@@ -373,3 +373,63 @@ test('date keys retain month and weekday in a timezone west of UTC', async () =>
     assert.match(a.get('result').innerHTML, /周二/);
   } finally { process.env.TZ = 'Asia/Shanghai'; }
 });
+
+test('valid epoch milliseconds and UTF-8 BOM survive import and export', async () => {
+  const a = app();
+  assert.equal(await a.context.loadDataToMemory({ name: 'bom.json', text: async () => '\uFEFF{"1970-01-01":{"entries":[0,1,999]}}' }), true);
+  a.context.saveAndDownload();
+  assert.deepEqual(JSON.parse(a.blobs[0])['1970-01-01'].entries.map(x => new Date(x).getTime()), [0,1,999]);
+});
+
+test('rejects normalized 24:00 timestamps even if the resulting date matches the key', async () => {
+  const a = app();
+  assert.equal(await a.load({ '2026-09-11': { entries: '2026-09-10T24:00:00+08:00' } }), false);
+});
+
+test('oversized files are rejected before reading their content', async () => {
+  const a = app();
+  let read = false;
+  assert.equal(await a.context.loadDataToMemory({ name: 'large.json', size: 8*1024*1024+1, text: async () => { read = true; return '{}'; } }), false);
+  assert.equal(read, false);
+  assert.match(a.alerts.at(-1), /8 MB/);
+});
+
+test('missing next-year notice does not discard a valid December calendar', async () => {
+  const urls = [];
+  const a = app('2026-12-15T12:00:00+08:00', { seedCalendar: false, fetch: async url => {
+    urls.push(url);
+    if (/2026\.json$/.test(url)) return { ok: true, status: 200, json: async () => ({ year: 2026, days: [
+      { date: '2026-12-31', isOffDay: true, name: '元旦调整' }
+    ] }) };
+    throw new Error('next-year notice not published');
+  } });
+  const calendar = await a.context.loadHolidayCalendar(2026);
+  assert.equal(calendar.source, 'holiday-cn');
+  assert.equal(calendar.days['2026-12-31'].isOffDay, true);
+  assert.equal(urls.length, 2);
+});
+
+test('malformed cached holiday entries are discarded instead of marking workdays as unknown', () => {
+  const a = app(undefined, { cachedCalendar: { year: 2026, fetchedAt: Date.now(), source: 'old', days: {
+    '2026-09-10': { isOffDay: true }
+  } } });
+  assert.equal(a.context.readHolidayCache(2026), null);
+});
+
+test('extra JSON fields named __proto__ remain data during normalization and export', async () => {
+  const a = app();
+  const data = JSON.parse('{"2026-09-10":{"entries":[],"__proto__":{"note":"keep me"}}}');
+  assert.equal(await a.load(data), true);
+  a.context.saveAndDownload();
+  assert.deepEqual(JSON.parse(a.blobs[0]), data);
+});
+
+test('historical timezone offsets containing seconds do not change backup instants', async () => {
+  const a = app();
+  const instant = new Date('1900-01-01T00:00:00Z').getTime();
+  assert.equal(await a.load({ '1900-01-01': { entries: instant } }), true);
+  a.context.saveAndDownload();
+  const value = JSON.parse(a.blobs[0])['1900-01-01'].entries[0];
+  assert.equal(new Date(value).getTime(), instant);
+  assert.equal(await a.load(JSON.parse(a.blobs[0])), true);
+});

@@ -32,24 +32,26 @@ open class AttendanceWidget : AppWidgetProvider() {
         }
         private fun updateAllInternal(context: Context) {
             val manager = AppWidgetManager.getInstance(context)
+            val classes = listOf(QuickAttendanceWidget::class.java, SmallAttendanceWidget::class.java,
+                TodayAttendanceWidget::class.java, StripAttendanceWidget::class.java,
+                MediumAttendanceWidget::class.java, LargeAttendanceWidget::class.java)
+            val widgetIds = classes.map { manager.getAppWidgetIds(ComponentName(context, it)) }
+            if (widgetIds.all { it.isEmpty() }) return
             val store = RecordStore.get(context)
             store.load()
             val state = store.state.value
             val now = ZonedDateTime.now(WorkZone)
             val today = state.records.find { it.date == now.toLocalDate() }
             val prefs = context.getSharedPreferences("preferences", 0)
-            val classes = listOf(QuickAttendanceWidget::class.java, SmallAttendanceWidget::class.java,
-                TodayAttendanceWidget::class.java, StripAttendanceWidget::class.java,
-                MediumAttendanceWidget::class.java, LargeAttendanceWidget::class.java)
             val dark = when (prefs.getString("dark", "system")) {
                 "dark" -> true
                 "light" -> false
                 else -> context.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK == android.content.res.Configuration.UI_MODE_NIGHT_YES
             }
-            val widgetData = WidgetData(now, today?.punches.orEmpty(), state.error)
+            val widgetData = WidgetData(now, today?.punches.orEmpty().takeLast(19), state.error)
             val defaults = listOf(130f to 60f, 130f to 180f, 210f to 180f, 280f to 60f, 280f to 180f, 280f to 270f)
-            classes.forEachIndexed { index, clazz ->
-                manager.getAppWidgetIds(ComponentName(context, clazz)).forEach { id ->
+            widgetIds.forEachIndexed { index, ids ->
+                ids.forEach { id ->
                     runCatching {
                         val options = manager.getAppWidgetOptions(id)
                         fun view(width: Float, height: Float) = WidgetViews.create(context, id, width, height, widgetData, dark)

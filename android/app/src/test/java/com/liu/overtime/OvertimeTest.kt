@@ -68,4 +68,39 @@ class OvertimeTest {
         assertTrue(csv.startsWith("\uFEFF"))
         assertTrue(csv.contains("\"含\"\"引号,名称\""))
     }
+
+    @Test fun bomAndEpochMillisecondsAreValidButInvalidIsoNeverNormalizes() {
+        val decoded = RecordCodec.decode("\uFEFF" + """{"1970-01-01":{"entries":[0,1,999]}}""")
+        assertEquals(listOf(0L, 1L, 999L), decoded.single().punches.map { it.toEpochMilli() })
+        for (stamp in listOf("2026-09-10T24:00:00+08:00", "2026-09-11T12:60:00+08:00", "2026-09-11T12:00:60+08:00")) {
+            assertTrue(runCatching { RecordCodec.decode("""{"2026-09-11":{"entries":"$stamp"}}""") }.isFailure)
+        }
+    }
+
+    @Test fun largeMergePreservesEveryDateAndExistingMetadataWins() {
+        val start = LocalDate.of(2000, 1, 1)
+        val existing = (0 until 10_000).map { index ->
+            val date = start.plusDays(index.toLong())
+            DayRecord(date, listOf(date.atTime(9,0).atZone(WorkZone).toInstant()), buildJsonObject { put("note", "local") })
+        }
+        val incoming = existing.drop(5000).map { it.copy(punches = it.punches + it.punches, extra = buildJsonObject { put("note", "incoming"); put("new", true) }) }
+        val begin = System.nanoTime()
+        val merged = RecordCodec.merge(existing, incoming)
+        println("merge 10000 dates: ${(System.nanoTime() - begin) / 1_000_000.0} ms")
+        assertEquals(10_000, merged.size)
+        assertEquals(15_000, merged.sumOf { it.punches.size })
+        assertEquals("local", merged.last().extra["note"]!!.jsonPrimitive.content)
+        assertEquals(true, merged.last().extra["new"]!!.jsonPrimitive.boolean)
+        assertEquals(merged, RecordCodec.merge(merged, incoming))
+    }
+
+    @Test fun csvFirstLastRemainCorrectEvenWithAnUnsortedRecord() {
+        val csv = Overtime.csv(listOf(Overtime.summarize(record("2026-09-10", "19:00", "09:00", "18:00"), emptyMap())))
+        assertTrue(csv.contains("\"09:00\",\"19:00\",\"5400\""))
+    }
+
+    @Test fun historicShanghaiOffsetDoesNotLoseSecondsOnBackupRoundTrip() {
+        val original = listOf(record("1900-01-01", "00:00:00", "09:00:00"))
+        assertEquals(original, RecordCodec.decode(RecordCodec.encode(original)))
+    }
 }

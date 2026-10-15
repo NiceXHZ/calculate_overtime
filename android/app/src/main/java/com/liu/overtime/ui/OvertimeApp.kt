@@ -16,12 +16,15 @@ import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
+import androidx.compose.material.icons.automirrored.outlined.EventNote
+import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -81,7 +84,7 @@ fun OvertimeApp(vm: MainViewModel = viewModel(), todayRequest: Int = 0) {
         var tab by rememberSaveable { mutableIntStateOf(0) }
         var adding by rememberSaveable { mutableStateOf(false) }
         var selected by remember { mutableStateOf<LocalDate?>(null) }
-        var deleting by remember { mutableStateOf<Pair<LocalDate, Int>?>(null) }
+        var deleting by remember { mutableStateOf<Triple<LocalDate, Int, Instant>?>(null) }
         var recovering by remember { mutableStateOf(false) }
         var choosingCutoff by rememberSaveable { mutableStateOf(false) }
         val modalVisible = adding || selected != null || deleting != null || recovering || choosingCutoff
@@ -104,18 +107,21 @@ fun OvertimeApp(vm: MainViewModel = viewModel(), todayRequest: Int = 0) {
         val haptic = LocalHapticFeedback.current
         val backdrop = rememberLayerBackdrop()
         val scrollPositions = List(4) { rememberLazyListState() }
-        val summaries = remember(state.records, month, calendar, prefs.cutoff) { Overtime.month(state.records, month, calendar.days, prefs.cutoff) }
-        val today = state.records.find { it.date == now.toLocalDate() }
+        val summary by vm.summaries.collectAsStateWithLifecycle()
+        val summaries = if (summary.month == month) summary.days else emptyList()
+        val today = remember(state.records, now.toLocalDate()) { state.records.find { it.date == now.toLocalDate() } }
+        val currentMonthTotal by vm.currentMonthTotal.collectAsStateWithLifecycle()
         val total = summaries.sumOf { it.seconds }
         val import = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { it?.let(vm::import) }
         val export = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { it?.let { vm.export(it, false) } }
-        val csv = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { it?.let { vm.export(it, true) } }
+        var exportMonth by rememberSaveable { mutableStateOf(month.toString()) }
+        val csv = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { it?.let { vm.export(it, true, YearMonth.parse(exportMonth)) } }
         LaunchedEffect(vm) {
             vm.notices.collect { notice ->
                 haptic.performHapticFeedback(HapticFeedbackType.Confirm)
                 val result = snackbar.showSnackbar(notice.text, if (notice.undo != null) "撤销" else null, withDismissAction = true,
                     duration = if (notice.undo != null) SnackbarDuration.Long else SnackbarDuration.Short)
-                if (result == SnackbarResult.ActionPerformed) notice.undo?.let(vm::undo)
+                if (result == SnackbarResult.ActionPerformed) notice.undo?.let { vm.undo(it, notice.undoRevision) }
             }
         }
         BackHandler(tab != 0 && !modalVisible) { tab = 0 }
@@ -152,19 +158,21 @@ fun OvertimeApp(vm: MainViewModel = viewModel(), todayRequest: Int = 0) {
                                         Icon(Icons.Outlined.TouchApp, null); Spacer(Modifier.width(10.dp)); Text(if (busy) "正在保存…" else "记录打卡", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
                                     }
                                     Spacer(Modifier.height(12.dp))
-                                    Text(if (today?.punches.isNullOrEmpty()) "今天还没有打卡，轻点一下开始记录" else "今天已记录 ${today!!.punches.size} 次 · 最近 ${today.punches.last().atZone(WorkZone).format(timeFormat)}", modifier = Modifier.align(Alignment.CenterHorizontally), color = colors.onSurfaceVariant, fontSize = 12.sp)
+                                    Text(if (today?.punches.isNullOrEmpty()) "今天还没有打卡，轻点一下开始记录" else "今天已记录 ${today.punches.size} 次 · 最近 ${today.punches.last().atZone(WorkZone).format(timeFormat)}", modifier = Modifier.align(Alignment.CenterHorizontally), color = colors.onSurfaceVariant, fontSize = 12.sp)
                                 }
                             }
                             item { Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                Metric("${now.monthValue}月加班", Overtime.hours(Overtime.month(state.records, YearMonth.from(now), todayCalendar.days, prefs.cutoff).sumOf { it.seconds }), "小时", Modifier.weight(1f))
+                                Metric("${now.monthValue}月加班", Overtime.hours(currentMonthTotal), "小时", Modifier.weight(1f))
                                 Metric("今日打卡", (today?.punches?.size ?: 0).toString(), "次", Modifier.weight(1f))
                             } }
                             item { SectionTitle("今天的时间线", "补卡") { adding = true } }
                             item {
                                 GlassCard {
                                     if (today?.punches.isNullOrEmpty()) EmptyState(Icons.Outlined.WbSunny, "从容开始新的一天", "打卡后，时间线会出现在这里。")
-                                    else today!!.punches.forEachIndexed { index, instant ->
-                                        PunchRow(index, instant, busy) { deleting = today.date to index }
+                                    else LazyColumn(Modifier.fillMaxWidth().heightIn(max = 360.dp).testTag("today-punch-list")) {
+                                        itemsIndexed(today.punches) { index, instant ->
+                                            PunchRow(index, instant, busy) { deleting = Triple(today.date, index, instant) }
+                                        }
                                     }
                                 }
                             }
@@ -177,7 +185,7 @@ fun OvertimeApp(vm: MainViewModel = viewModel(), todayRequest: Int = 0) {
                                 FilledTonalButton(onClick = { adding = true }, modifier = Modifier.weight(1f), enabled = !busy && state.error == null) { Icon(Icons.Outlined.Add, null); Text("补录打卡") }
                                 OutlinedButton(onClick = { import.launch(arrayOf("application/json", "text/plain", "application/octet-stream")) }, modifier = Modifier.weight(1f), enabled = !busy && state.error == null) { Text("导入 JSON") }
                             } }
-                            if (summaries.isEmpty()) item { GlassCard { EmptyState(Icons.Outlined.EventNote, "本月还没有记录", "可以直接打卡、补录，或导入网页端 JSON。") } }
+                            if (summaries.isEmpty()) item { GlassCard { EmptyState(Icons.AutoMirrored.Outlined.EventNote, "本月还没有记录", "可以直接打卡、补录，或导入网页端 JSON。") } }
                             items(summaries, key = { it.record.date.toString() }) { day ->
                                 GlassCard(onClick = { selected = day.record.date }) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -185,7 +193,8 @@ fun OvertimeApp(vm: MainViewModel = viewModel(), todayRequest: Int = 0) {
                                         Text(Overtime.duration(day.seconds), color = colors.primary, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                                     }
                                     Spacer(Modifier.height(14.dp))
-                                    Text(day.record.punches.joinToString("   ·   ") { it.atZone(WorkZone).format(DateTimeFormatter.ofPattern("HH:mm")) }, fontSize = 13.sp, color = colors.onSurfaceVariant)
+                                    Text(day.record.punches.take(8).joinToString("   ·   ") { it.atZone(WorkZone).format(DateTimeFormatter.ofPattern("HH:mm")) } +
+                                        if (day.record.punches.size > 8) "   … 点按查看全部" else "", fontSize = 13.sp, color = colors.onSurfaceVariant)
                                 }
                             }
                         }
@@ -203,7 +212,7 @@ fun OvertimeApp(vm: MainViewModel = viewModel(), todayRequest: Int = 0) {
                                 Spacer(Modifier.height(12.dp)); Text("颜色越深，加班越久 · 灰色为无记录", fontSize = 11.sp, color = colors.onSurfaceVariant)
                             } }
                             item { Hint(calendar.message, "工作日从 ${prefs.cutoff} 起计算；休息日取首末打卡间隔，不扣休息时间。", Icons.Outlined.Info) }
-                            item { OutlinedButton(onClick = { csv.launch("overtime-$month.csv") }, modifier = Modifier.fillMaxWidth().height(50.dp), enabled = !busy && summaries.isNotEmpty()) { Icon(Icons.Outlined.FileDownload, null); Spacer(Modifier.width(8.dp)); Text("导出本月报表 CSV") } }
+                            item { OutlinedButton(onClick = { exportMonth = month.toString(); csv.launch("overtime-$month.csv") }, modifier = Modifier.fillMaxWidth().height(50.dp), enabled = !busy && !refreshing && state.error == null && summaries.isNotEmpty()) { Icon(Icons.Outlined.FileDownload, null); Spacer(Modifier.width(8.dp)); Text("导出本月报表 CSV") } }
                         }
                         3 -> {
                             item { GlassCard {
@@ -262,7 +271,11 @@ fun OvertimeApp(vm: MainViewModel = viewModel(), todayRequest: Int = 0) {
                             item { Hint("加班打卡 ${BuildConfig.VERSION_NAME}", "所有记录保存在本机，北京时间。联网仅用于获取公开节假日。卸载会清除本地数据，请先导出备份。", Icons.Outlined.FavoriteBorder) }
                             item { GlassCard {
                                 SettingsAction(Icons.Outlined.Code, "项目源码与说明", "加班打卡 · 网页端与 Android 原生应用") {
-                                    context.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/NiceXHZ/calculate_overtime")))
+                                    try {
+                                        context.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/NiceXHZ/calculate_overtime")))
+                                    } catch (_: android.content.ActivityNotFoundException) {
+                                        android.widget.Toast.makeText(context, "未找到浏览器，请安装浏览器后重试", android.widget.Toast.LENGTH_SHORT).show()
+                                    }
                                 }
                             } }
                         }
@@ -273,7 +286,7 @@ fun OvertimeApp(vm: MainViewModel = viewModel(), todayRequest: Int = 0) {
             val navModifier = if (prefs.glass && !lowRam && Build.VERSION.SDK_INT >= 31) Modifier.drawBackdrop(backdrop, { navShape }, effects = { blur(18.dp.toPx()); lens(18.dp.toPx(), 24.dp.toPx()) }, onDrawSurface = { drawRect(colors.surface.copy(alpha = if (dark) .92f else .56f)) })
                 else Modifier.background(colors.surface.copy(alpha = .98f), navShape)
             Row(Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(horizontal = 24.dp, vertical = 12.dp).fillMaxWidth().then(navModifier).border(1.dp, colors.surface.copy(alpha = .7f), navShape).padding(6.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
-                val tabs = listOf(Icons.Outlined.Home to "今天", Icons.Outlined.ReceiptLong to "记录", Icons.Outlined.BarChart to "统计", Icons.Outlined.Tune to "设置")
+                val tabs = listOf(Icons.Outlined.Home to "今天", Icons.AutoMirrored.Outlined.ReceiptLong to "记录", Icons.Outlined.BarChart to "统计", Icons.Outlined.Tune to "设置")
                 tabs.forEachIndexed { index, (icon,label) ->
                     val tint by animateColorAsState(if (tab == index) colors.primary else colors.onSurfaceVariant, label = "tab")
                     Column(Modifier.weight(1f).clip(RoundedCornerShape(26.dp)).background(if (tab == index) colors.primary.copy(alpha = .10f) else Color.Transparent).selectable(selected = tab == index, role = Role.Tab) { tab = index }.padding(vertical = 10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -286,10 +299,10 @@ fun OvertimeApp(vm: MainViewModel = viewModel(), todayRequest: Int = 0) {
             val glass = prefs.glass && !lowRam
             when {
                 deleting != null -> {
-                    val (date, index) = deleting!!
+                    val (date, index, instant) = deleting!!
                     GlassConfirmation("删除这次打卡？", "将移除 $date 的第 ${index + 1} 次打卡。修改前副本会保留在本机。",
                         "删除打卡", destructive = true, backdrop = backdrop, glass = glass,
-                        onDismiss = { deleting = null }, onConfirm = { vm.remove(date, index); deleting = null })
+                        onDismiss = { deleting = null }, onConfirm = { vm.remove(date, index, instant); deleting = null })
                 }
                 recovering -> GlassConfirmation("恢复最近副本？", "当前记录将回退到最近一次修改前。恢复前建议先导出当前完整备份。",
                     "恢复副本", backdrop = backdrop, glass = glass,
@@ -301,13 +314,13 @@ fun OvertimeApp(vm: MainViewModel = viewModel(), todayRequest: Int = 0) {
                     onSave = { time -> vm.updatePreferences { it.copy(cutoff = time) }; choosingCutoff = false })
                 selected != null -> {
                     val date = selected!!
-                    GlassSheet(date.format(dayFormat), backdrop, glass, onDismiss = { selected = null }) {
-                        val record = state.records.find { it.date == date }
-                        if (record?.punches.isNullOrEmpty()) Text("当天已无打卡")
-                        record?.punches?.forEachIndexed { index, instant ->
-                            PunchRow(index, instant, busy) { deleting = date to index }
+                    val record = state.records.find { it.date == date }
+                    GlassSheet(date.format(dayFormat), backdrop, glass, onDismiss = { selected = null }, listContent = {
+                        if (record?.punches.isNullOrEmpty()) item { Text("当天已无打卡") }
+                        itemsIndexed(record?.punches.orEmpty()) { index, instant ->
+                            PunchRow(index, instant, busy) { deleting = Triple(date, index, instant) }
                         }
-                    }
+                    }) {}
                 }
             }
         }

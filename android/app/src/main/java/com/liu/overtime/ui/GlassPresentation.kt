@@ -12,6 +12,8 @@ import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -30,6 +32,7 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -50,6 +53,7 @@ internal fun GlassSheet(
     glass: Boolean,
     onDismiss: () -> Unit,
     footer: @Composable ColumnScope.() -> Unit = {},
+    listContent: (LazyListScope.() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val colors = MaterialTheme.colorScheme
@@ -118,7 +122,9 @@ internal fun GlassSheet(
                         }
                     }
                 }
-                Column(Modifier.weight(1f, fill = false).fillMaxWidth()
+                if (listContent != null) LazyColumn(Modifier.weight(1f, fill = false).fillMaxWidth().testTag("sheet-record-list"),
+                    contentPadding = PaddingValues(horizontal = 24.dp), content = listContent)
+                else Column(Modifier.weight(1f, fill = false).fillMaxWidth()
                     .verticalScroll(rememberScrollState()).padding(horizontal = 24.dp), content = content)
                 Column(Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp,
                     top = if (compact) 8.dp else 12.dp, bottom = if (compact) 12.dp else 20.dp),
