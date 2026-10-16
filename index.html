@@ -11,9 +11,19 @@
       name="description"
       content="本地优先的加班统计工具：导入打卡 JSON，查看按月热力图，补录记录并导出备份。"
     />
-    <title>加班月报 · 加班打卡</title>
-    <link rel="icon" type="image/png" href="./icon.png" />
-    <link rel="apple-touch-icon" href="./icon.png" />
+    <meta name="application-name" content="加班统计工具" />
+    <meta name="apple-mobile-web-app-title" content="加班统计工具" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <title>加班统计工具</title>
+    <link rel="icon" type="image/png" sizes="180x180" href="./icon.png?v=2" />
+    <link
+      rel="apple-touch-icon"
+      sizes="180x180"
+      href="./apple-touch-icon.png?v=2"
+    />
+    <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="stylesheet" href="./web/styles.css" />
     <script src="./web/core.js" defer></script>
     <script src="./web/holidays.js" defer></script>
@@ -96,10 +106,10 @@
     </div>
     <div class="app-shell">
       <header class="topbar liquid">
-        <a class="brand" href="#main" aria-label="加班打卡，回到月度概览"
+        <a class="brand" href="#main" aria-label="加班统计工具，回到月度概览"
           ><span class="brand-mark"
             ><svg class="icon"><use href="#i-clock" /></svg></span
-          ><span>加班打卡 <small>WEB</small></span></a
+          ><span>加班统计工具 <small>WEB</small></span></a
         >
         <nav class="top-nav" aria-label="页面导航">
           <a href="#overview" class="active">月度概览</a
@@ -416,7 +426,7 @@
           </div>
         </section>
         <footer class="page-footer">
-          <span>加班打卡 · 为你的时间留一份记录</span
+          <span>加班统计工具 · 为你的时间留一份记录</span
           ><a
             href="https://github.com/NiceXHZ/calculate_overtime"
             target="_blank"

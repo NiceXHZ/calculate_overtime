@@ -388,7 +388,6 @@ function readableMonth(month) {
   return Number(month.slice(0, 4)) + "年" + Number(month.slice(5)) + "月";
 }
 function updateMonthUi() {
-  document.title = readableMonth(selectedMonth) + "加班月报 · 加班打卡";
   $("selectedMonthLabel").textContent = readableMonth(selectedMonth);
   $("calendarMonthLabel").textContent = selectedMonth.replace("-", " / ");
   $("previousMonth").disabled = shiftMonth(selectedMonth, -1) === selectedMonth;

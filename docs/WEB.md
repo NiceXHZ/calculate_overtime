@@ -2,6 +2,16 @@
 
 网页提供加班月报、热力图和打卡编辑，使用原生 HTML、CSS、JavaScript。没有运行时框架、字体 CDN 或打卡数据上传服务；可在线使用，也可保留整个目录后直接打开 `index.html`。
 
+## 添加到 iOS 主屏幕
+
+在 Safari 打开在线网页，选择分享 →「添加到主屏幕」。网页名称与桌面名称固定为「加班统计工具」，切换月份不会改变名称。支持「作为网页 App 打开」开关的系统中，保持该开关开启即可使用独立窗口。
+
+桌面图标使用不透明的绿色时钟 PNG，提供 180、192、512 像素版本；iOS 元信息和 Web App Manifest 同时声明名称、图标与独立窗口模式。页面保留缩放能力，并为刘海、横屏安全区域和底部手势条留出空间。
+
+已有入口可能保留创建时的名称和图标。如果更新后仍旧显示异常，先导出 JSON 备份，再移除旧入口，并从 Safari 重新添加。主屏幕网页 App 与 Safari 的草稿存储可能独立，需要通过 JSON 导入已有记录；此适配不新增离线缓存或后台同步。
+
+配置依据：[Apple 主屏幕名称、图标与独立窗口说明](https://developer.apple.com/library/archive/documentation/AppleApplications/Reference/SafariWebContent/ConfiguringWebApplications/ConfiguringWebApplications.html)、[WebKit 主屏幕网页 App 说明](https://webkit.org/blog/17333/webkit-features-in-safari-26-0/)。
+
 ## 从记录开始
 
 - **导入 JSON**：点击导入或拖放文件，载入后自动计算。本月有记录时优先显示本月，否则显示最新的有记录月份。完整校验通过后才替换当前数据，损坏文件不会覆盖已载入的工作区。
@@ -60,7 +70,7 @@ npm run dev
 # 打开 http://127.0.0.1:4173
 
 npm run build
-# dist/ 只包含网页、图标、公开示例和 web/ 静态资源
+# dist/ 只包含网页、桌面安装清单、图标、公开示例和 web/ 静态资源
 ```
 
 `vercel.json` 明确设置 `npm run build` 与 `dist/` 输出目录。生产静态文件不包含 Android 工程、测试工具、个人数据、签名或 `node_modules`。本地直接打开页面无需安装 Node.js，但需要保留相邻 `web/` 资源目录。

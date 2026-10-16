@@ -1,4 +1,4 @@
-# 加班时长计算器 / 加班打卡
+# 加班统计工具 / 加班打卡
 
 记录出勤时间，按工作日、周末、法定节假日与调休规则计算加班时长。
 
@@ -31,6 +31,8 @@
 ### 网页与 iOS
 
 网页可直接[在线打开](https://calculate-overtime.vercel.app/)，也可下载源码后用浏览器打开 `index.html`。
+
+iPhone / iPad 可在 Safari 中打开在线网页，通过分享菜单选择「添加到主屏幕」，以「加班统计工具」独立窗口使用。桌面图标采用与网页一致的绿色时钟。已添加的旧入口若仍显示旧名称或图标，先导出 JSON 备份，再移除旧入口、重新添加。
 
 iOS [打卡快捷指令](https://www.icloud.com/shortcuts/1d4ad7c1eae14dbb964682359b14b8fc)每次运行会将当前时间追加到 `iCloud Drive/Shortcuts/overtime_log.json`，随后可将该文件导入网页查看。
 

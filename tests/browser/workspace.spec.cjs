@@ -51,6 +51,132 @@ test.beforeEach(async ({ page }) => {
 test.afterEach(async ({ page }) => {
   expect(runtimeErrors.get(page) || []).toEqual([]);
 });
+test("home-screen identity stays stable across imports and month changes, with valid install assets", async ({
+  page,
+  request,
+}) => {
+  await expect(page).toHaveTitle("加班统计工具");
+  await expect(page.locator(".brand")).toContainText("加班统计工具");
+  for (const name of ["application-name", "apple-mobile-web-app-title"]) {
+    await expect(page.locator(`meta[name="${name}"]`)).toHaveAttribute(
+      "content",
+      "加班统计工具",
+    );
+  }
+  await expect(
+    page.locator('meta[name="apple-mobile-web-app-capable"]'),
+  ).toHaveAttribute("content", "yes");
+  const manifestUrl = await page
+    .locator('link[rel="manifest"]')
+    .evaluate((link) => link.href);
+  const response = await request.get(manifestUrl);
+  expect(response.ok()).toBeTruthy();
+  expect(response.headers()["content-type"]).toContain(
+    "application/manifest+json",
+  );
+  const manifest = await response.json();
+  expect(manifest.name).toBe("加班统计工具");
+  expect(manifest.short_name).toBe("加班统计工具");
+  expect(manifest.display).toBe("standalone");
+  expect(new URL(manifest.start_url, manifestUrl).href).toBe(
+    new URL("/", manifestUrl).href,
+  );
+  expect(new URL(manifest.scope, manifestUrl).href).toBe(
+    new URL("/", manifestUrl).href,
+  );
+  const appleIcon = await page
+    .locator('link[rel="apple-touch-icon"]')
+    .evaluate((link) => link.href);
+  const icons = [
+    { url: appleIcon, size: 180 },
+    ...manifest.icons.map((icon) => ({
+      url: new URL(icon.src, manifestUrl).href,
+      size: Number(icon.sizes.split("x")[0]),
+    })),
+  ];
+  for (const { url, size } of icons) {
+    const asset = await request.get(url);
+    expect(asset.ok()).toBeTruthy();
+    expect(asset.headers()["content-type"]).toContain("image/png");
+    const dimensions = await page.evaluate(async (source) => {
+      const image = new Image();
+      image.src = source;
+      await image.decode();
+      const canvas = document.createElement("canvas");
+      canvas.width = image.naturalWidth;
+      canvas.height = image.naturalHeight;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(image, 0, 0);
+      const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      let opaque = true;
+      for (let alpha = 3; alpha < pixels.length; alpha += 4) {
+        if (pixels[alpha] !== 255) {
+          opaque = false;
+          break;
+        }
+      }
+      return { width: image.naturalWidth, height: image.naturalHeight, opaque };
+    }, url);
+    expect(dimensions).toEqual({ width: size, height: size, opaque: true });
+  }
+  const fallback = await request.get("/apple-touch-icon.png");
+  expect(fallback.ok()).toBeTruthy();
+  expect(await fallback.body()).toEqual(
+    await (await request.get(appleIcon)).body(),
+  );
+  await load(page);
+  await expect(page).toHaveTitle("加班统计工具");
+  await page.locator("#previousMonth").click();
+  await expect(page.locator("#selectedMonthLabel")).toHaveText("2026年8月");
+  await expect(page).toHaveTitle("加班统计工具");
+  await page.goto("/index.html");
+  await expect(page).toHaveTitle("加班统计工具");
+});
+
+test("home-screen safe areas keep the full app name and controls clear in portrait and landscape", async ({
+  page,
+}, testInfo) => {
+  await load(page);
+  for (const { width, height, top, side, bottom } of [
+    { width: 320, height: 568, top: 20, side: 0, bottom: 0 },
+    { width: 390, height: 844, top: 59, side: 0, bottom: 34 },
+    { width: 844, height: 390, top: 0, side: 59, bottom: 21 },
+  ]) {
+    await page.setViewportSize({ width, height });
+    await page.evaluate(
+      ({ top, side, bottom }) => {
+        const root = document.documentElement.style;
+        root.setProperty("--safe-top", `${top}px`);
+        root.setProperty("--safe-left", `${side}px`);
+        root.setProperty("--safe-right", `${side}px`);
+        root.setProperty("--safe-bottom", `${bottom}px`);
+        scrollTo(0, 0);
+      },
+      { top, side, bottom },
+    );
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth - innerWidth),
+    ).toBeLessThanOrEqual(1);
+    await insideViewport(page, ".topbar");
+    await insideViewport(page, ".action-dock");
+    const header = await page.locator(".topbar").boundingBox();
+    const dock = await page.locator(".action-dock").boundingBox();
+    const brand = await page.locator(".brand").boundingBox();
+    const actions = await page.locator(".top-actions").boundingBox();
+    expect(header.y).toBeGreaterThanOrEqual(top);
+    expect(header.x).toBeGreaterThanOrEqual(side);
+    expect(header.x + header.width).toBeLessThanOrEqual(width - side);
+    expect(dock.y + dock.height).toBeLessThanOrEqual(height - bottom);
+    expect(brand.x + brand.width).toBeLessThanOrEqual(actions.x);
+    await page.locator("#dockAdd").click();
+    await insideViewport(page, "#savePunchButton");
+    await page.locator('[data-close="editorOverlay"]').click();
+    await page.screenshot({
+      path: testInfo.outputPath(`home-screen-${width}.png`),
+    });
+  }
+});
+
 test("import auto-selects a recorded month and full JSON / monthly CSV preserve correct scope", async ({
   page,
 }, testInfo) => {

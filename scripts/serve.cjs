@@ -8,6 +8,8 @@ const types = {
   ".css": "text/css; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
   ".json": "application/json; charset=utf-8",
+  ".webmanifest": "application/manifest+json; charset=utf-8",
+  ".svg": "image/svg+xml",
   ".png": "image/png",
   ".txt": "text/plain; charset=utf-8",
 };
@@ -26,9 +28,13 @@ http
     }
     if (name === "/") name = "/index.html";
     if (
-      !["/index.html", "/icon.png", "/overtime_log.example.json"].includes(
-        name,
-      ) &&
+      ![
+        "/index.html",
+        "/icon.png",
+        "/apple-touch-icon.png",
+        "/manifest.webmanifest",
+        "/overtime_log.example.json",
+      ].includes(name) &&
       !name.startsWith("/web/")
     ) {
       res.writeHead(404).end();
