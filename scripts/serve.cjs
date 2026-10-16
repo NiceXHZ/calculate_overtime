@@ -1,6 +1,7 @@
 const http = require("node:http");
 const fs = require("node:fs");
 const path = require("node:path");
+const { inlineTouchIcon } = require("./inline-touch-icon.cjs");
 const root = path.resolve(__dirname, "..");
 const port = Number(process.env.PORT || 4173);
 const types = {
@@ -56,6 +57,17 @@ http
       if (error) {
         res.writeHead(404).end();
         return;
+      }
+      if (name === "/index.html") {
+        try {
+          data = inlineTouchIcon(
+            data.toString("utf8"),
+            fs.readFileSync(path.join(root, "apple-touch-icon.png")),
+          );
+        } catch {
+          res.writeHead(500).end("Unable to prepare the home-screen icon.");
+          return;
+        }
       }
       res.writeHead(200, {
         "Content-Type": types[path.extname(file)] || "application/octet-stream",

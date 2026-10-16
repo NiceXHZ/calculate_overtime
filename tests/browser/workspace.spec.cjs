@@ -87,6 +87,9 @@ test("home-screen identity stays stable across imports and month changes, with v
   const appleIcon = await page
     .locator('link[rel="apple-touch-icon"]')
     .evaluate((link) => link.href);
+  expect(appleIcon).toMatch(/^data:image\/png;base64,/);
+  // The image must still decode when an extra touch-icon request cannot finish.
+  await page.route("**/apple-touch-icon.png*", (route) => route.abort());
   const icons = [
     { url: appleIcon, size: 180 },
     ...manifest.icons.map((icon) => ({
@@ -95,9 +98,11 @@ test("home-screen identity stays stable across imports and month changes, with v
     })),
   ];
   for (const { url, size } of icons) {
-    const asset = await request.get(url);
-    expect(asset.ok()).toBeTruthy();
-    expect(asset.headers()["content-type"]).toContain("image/png");
+    if (!url.startsWith("data:")) {
+      const asset = await request.get(url);
+      expect(asset.ok()).toBeTruthy();
+      expect(asset.headers()["content-type"]).toContain("image/png");
+    }
     const dimensions = await page.evaluate(async (source) => {
       const image = new Image();
       image.src = source;
@@ -122,7 +127,7 @@ test("home-screen identity stays stable across imports and month changes, with v
   const fallback = await request.get("/apple-touch-icon.png");
   expect(fallback.ok()).toBeTruthy();
   expect(await fallback.body()).toEqual(
-    await (await request.get(appleIcon)).body(),
+    Buffer.from(appleIcon.split(",")[1], "base64"),
   );
   await load(page);
   await expect(page).toHaveTitle("加班统计工具");

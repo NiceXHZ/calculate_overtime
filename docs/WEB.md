@@ -8,6 +8,10 @@
 
 桌面图标使用不透明的绿色时钟 PNG，提供 180、192、512 像素版本；iOS 元信息和 Web App Manifest 同时声明名称、图标与独立窗口模式。页面保留缩放能力，并为刘海、横屏安全区域和底部手势条留出空间。
 
+针对 iOS 27.2 Beta 中添加主屏幕仍显示名称首字的反馈，生产构建会自动把 180 像素 PNG 内嵌到 HTML 的 `apple-touch-icon`，避免添加面板单独请求该图片。本地 `npm run dev` 使用相同处理；原始 HTML 仍引用独立图片，直接打开源码时保持原有方式。普通图标文件和 Manifest 图标也继续提供。
+
+这是依据[开发者实测反馈](https://www.reddit.com/r/PWA/comments/1wsruwy/pwa_icon_not_working_on_ios_272beta2/)采用的兼容方案，效果需在对应 iOS Beta 真机确认。自行部署时应运行 `npm run build` 并发布 `dist/`，仅发布仓库原始文件不会包含此处理。
+
 已有入口可能保留创建时的名称和图标。如果更新后仍旧显示异常，先导出 JSON 备份，再移除旧入口，并从 Safari 重新添加。主屏幕网页 App 与 Safari 的草稿存储可能独立，需要通过 JSON 导入已有记录；此适配不新增离线缓存或后台同步。
 
 配置依据：[Apple 主屏幕名称、图标与独立窗口说明](https://developer.apple.com/library/archive/documentation/AppleApplications/Reference/SafariWebContent/ConfiguringWebApplications/ConfiguringWebApplications.html)、[WebKit 主屏幕网页 App 说明](https://webkit.org/blog/17333/webkit-features-in-safari-26-0/)。
