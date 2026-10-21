@@ -1,5 +1,15 @@
 # 代码、效率与构建复查
 
+## 2026-10-21：0.3.5 应用图标快捷入口复查
+
+- 使用标准 Android 动态 App Shortcuts 提供「记录打卡」「补录打卡」「查看记录」，首次打开新版后注册，尊重桌面可显示数量。稳定 ID、中文标签与三个独立矢量图标随安装包提供；已有内容相同时不重复发布，无新增权限、服务或第三方依赖。
+- Intent 显式指向现有 MainActivity，使用 `NEW_TASK / CLEAR_TOP / SINGLE_TOP` 复用任务，不使用 `CLEAR_TASK` 清空应用。选择动态入口的任务栈依据见 [Android 官方说明](https://developer.android.com/develop/ui/compose/system/shortcuts/managing-shortcuts)，注册与拖出快捷图标见[快捷入口文档](https://developer.android.com/develop/ui/compose/system/shortcuts/creating-shortcuts)。不接入 Tasker、AppFunctions 或厂商语音助手。
+- 前台生命周期达到 RESUMED 且设备解锁后才消费请求；额外窗口焦点事件不会再次打卡。待解锁命令可随状态恢复，已消费命令不会因重建重复执行，从最近任务恢复的历史 Intent 不执行打卡。
+- 打卡复用现有存储、3 秒保护、结果和撤销提示；有数据操作进行时提示稍后重试。补卡重复打开保留输入，查看记录保留当前选中月份；打开普通应用图标不自动打卡。
+- **90 项 Android 测试全部通过**：新增 Android 9／15 的入口排序、显式 Intent、桌面数量限制、服务异常、命令消费、历史任务过滤、普通与快捷冷启动，以及已有页面导航、重复补卡、锁屏等待、窗口焦点重复通知和超过 3 秒保护期后的重建检查；复跑此前全部回归。
+- **Lint：0 错误、40 警告、1 提示**。新增提示建议可选的快捷入口使用排名上报，本版未接入该统计。五种正式 APK 均通过签名、版本、架构、16 KB 对齐与校验和检查，包含三条快捷命令，签名与 0.3.4 一致。
+- 本次源码与正式包对应 0.3.5，下载安装以 Releases 实际附件为准。未使用 ADB；测试验证代码和生命周期，不代表所有品牌桌面的实际菜单显示已完成真机认证。
+
 ## 2026-10-21：0.3.4 快捷打卡反馈追加复查
 
 - 查阅小米 MiHaptic、华为 Haptics Engine、OPPO HyperBoost、vivo 4D 振感和三星 One UI 官方资料，统一采用公开 Android API，不引入复杂波形 SDK 或未经验证的品牌私有分支。[资料与适配边界](WIDGET_FEEDBACK.md)单独记录。

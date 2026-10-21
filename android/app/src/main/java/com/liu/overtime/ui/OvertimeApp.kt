@@ -59,6 +59,8 @@ import com.kyant.backdrop.effects.lens
 import com.liu.overtime.domain.*
 import com.liu.overtime.BuildConfig
 import com.liu.overtime.widget.*
+import com.liu.overtime.shortcuts.ShortcutRequest
+import com.liu.overtime.shortcuts.ShortcutAction
 import java.time.*
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -72,7 +74,7 @@ private val dayFormat = DateTimeFormatter.ofPattern("M月d日 EEEE", Locale.CHIN
 private val timeFormat = DateTimeFormatter.ofPattern("HH:mm:ss")
 
 @Composable
-fun OvertimeApp(vm: MainViewModel = viewModel(), todayRequest: Int = 0) {
+internal fun OvertimeApp(vm: MainViewModel = viewModel(), todayRequest: Int = 0, shortcutRequest: ShortcutRequest? = null) {
     val state by vm.state.collectAsStateWithLifecycle()
     val prefs by vm.preferences.collectAsStateWithLifecycle()
     val month by vm.month.collectAsStateWithLifecycle()
@@ -98,6 +100,13 @@ fun OvertimeApp(vm: MainViewModel = viewModel(), todayRequest: Int = 0) {
         LaunchedEffect(todayRequest) {
             if (todayRequest > 0) {
                 tab = 0; adding = false; selected = null; deleting = null; recovering = false; choosingCutoff = false
+            }
+        }
+        LaunchedEffect(shortcutRequest) {
+            shortcutRequest?.let { request ->
+                tab = if (request.action == ShortcutAction.RECORDS) 1 else 0
+                adding = request.action == ShortcutAction.ADD
+                selected = null; deleting = null; recovering = false; choosingCutoff = false
             }
         }
         val snackbar = remember { SnackbarHostState() }
@@ -292,6 +301,9 @@ fun OvertimeApp(vm: MainViewModel = viewModel(), todayRequest: Int = 0) {
                                 }
                                 if (pinState.outcome == PinOutcome.PENDING) Text("等待桌面确认…", fontSize = 12.sp, color = colors.onSurfaceVariant)
                                 Text("也可在系统快捷设置中添加「打卡」磁贴。", fontSize = 12.sp, color = colors.onSurfaceVariant)
+                                Text("长按应用图标可直接打卡、补录或查看记录；支持的桌面可拖出独立快捷图标。",
+                                    fontSize = 12.sp, lineHeight = 19.sp, color = colors.onSurfaceVariant,
+                                    modifier = Modifier.padding(top = 8.dp))
                             } }
                             item { Hint("加班打卡 ${BuildConfig.VERSION_NAME}", "所有记录保存在本机，北京时间。联网仅用于获取公开节假日。卸载会清除本地数据，请先导出备份。", Icons.Outlined.FavoriteBorder) }
                             item { GlassCard {

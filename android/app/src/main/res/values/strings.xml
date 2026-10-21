@@ -1,5 +1,8 @@
 <resources>
 <string name="app_name">加班打卡</string>
+<string name="shortcut_punch">记录打卡</string>
+<string name="shortcut_add">补录打卡</string>
+<string name="shortcut_records">查看记录</string>
 <string name="widget_quick">2×1 · 一键打卡</string>
 <string name="widget_small">2×2 · 今日打卡</string>
 <string name="widget_today">3×2 · 今日记录</string>

@@ -117,6 +117,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         Notice(if (result.added) "已记录 ${result.instant.atZone(WorkZone).toLocalTime().withNano(0)}" else RecordStore.DUPLICATE_NOTICE,
             if (result.added) result.instant else null, if (result.added) result.revision else null)
     }
+    fun punchFromShortcut() {
+        if (busy.value) messages.trySend(Notice("正在保存，请稍后再试"))
+        else punch()
+    }
     fun undo(instant: Instant, revision: Long? = null) = action { store.undoPunch(instant, revision); Notice("已撤销本次打卡") }
     fun add(date: LocalDate, time: LocalTime) = action {
         require(!date.isAfter(LocalDate.now(WorkZone))) { "不能补录未来日期" }

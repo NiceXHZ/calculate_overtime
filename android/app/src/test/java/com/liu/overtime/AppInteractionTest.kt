@@ -18,6 +18,54 @@ import java.io.File
 class AppInteractionTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
 
+    @Test fun shortcutNavigationClosesOtherPanelsAndRepeatedAddPreservesItsPicker() {
+        compose.waitUntil(15_000) { RecordStore.get(compose.activity).state.value.loaded }
+        compose.onNodeWithText("设置").performClick()
+        compose.onNodeWithText("工作日下班时间").performScrollTo().performClick()
+        deliverShortcut(com.liu.overtime.shortcuts.ShortcutAction.RECORDS)
+        compose.onNodeWithText("打卡记录").assertIsDisplayed()
+        compose.onNodeWithText("完成").assertDoesNotExist()
+        deliverShortcut(com.liu.overtime.shortcuts.ShortcutAction.ADD)
+        compose.onNodeWithText("补录打卡").assertIsDisplayed()
+        compose.onNodeWithText("日期").performClick()
+        deliverShortcut(com.liu.overtime.shortcuts.ShortcutAction.ADD)
+        compose.onNodeWithContentDescription("月份滚轮").assertIsDisplayed()
+        compose.onNodeWithText("保存打卡").assertIsDisplayed()
+    }
+
+    @Test fun shortcutPunchWaitsForUnlockAndIsNotReplayedAfterRecreation() {
+        val store = RecordStore.get(compose.activity)
+        compose.waitUntil(15_000) { store.state.value.loaded }
+        // Other interaction tests may have just punched. Expire the shared guard before this scenario.
+        Thread.sleep(3_100)
+        val before = store.state.value.records.sumOf { it.punches.size }
+        val keyguard = compose.activity.getSystemService(android.app.KeyguardManager::class.java)
+        compose.runOnIdle { org.robolectric.Shadows.shadowOf(keyguard).setIsDeviceLocked(true) }
+        deliverShortcut(com.liu.overtime.shortcuts.ShortcutAction.PUNCH)
+        compose.runOnIdle { assertEquals(before, store.state.value.records.sumOf { it.punches.size }) }
+        compose.runOnIdle {
+            org.robolectric.Shadows.shadowOf(keyguard).setIsDeviceLocked(false)
+            compose.activity.onWindowFocusChanged(true)
+            compose.activity.onWindowFocusChanged(true)
+        }
+        compose.waitUntil(10_000) { store.state.value.records.sumOf { it.punches.size } == before + 1 }
+        compose.waitUntil(10_000) { compose.onAllNodesWithText("撤销").fetchSemanticsNodes().isNotEmpty() }
+        // Wait beyond the guard: otherwise an accidental replay could be hidden by de-duplication.
+        Thread.sleep(3_100)
+        compose.activityRule.scenario.recreate()
+        compose.waitForIdle()
+        compose.runOnIdle { assertEquals(before + 1, store.state.value.records.sumOf { it.punches.size }) }
+        compose.onNodeWithText("记录打卡").assertIsDisplayed()
+    }
+
+    private fun deliverShortcut(action: com.liu.overtime.shortcuts.ShortcutAction) {
+        compose.runOnIdle {
+            MainActivity::class.java.getDeclaredMethod("onNewIntent", android.content.Intent::class.java)
+                .apply { isAccessible = true }
+                .invoke(compose.activity, com.liu.overtime.shortcuts.AppShortcuts.intent(compose.activity, action))
+        }
+    }
+
     @Test fun outgoingTodayPageCannotPunchWhileRecordsPageIsFadingIn() {
         val store = RecordStore.get(compose.activity)
         compose.waitUntil(15_000) { store.state.value.loaded }
