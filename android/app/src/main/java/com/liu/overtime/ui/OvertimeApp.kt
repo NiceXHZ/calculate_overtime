@@ -10,6 +10,8 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -84,6 +86,7 @@ fun OvertimeApp(vm: MainViewModel = viewModel(), todayRequest: Int = 0) {
     val colors = overtimeColorScheme(dark)
     MaterialTheme(colorScheme = colors, typography = Typography()) {
         var tab by rememberSaveable { mutableIntStateOf(0) }
+        val activeTab = rememberUpdatedState(tab)
         var adding by rememberSaveable { mutableStateOf(false) }
         var selected by remember { mutableStateOf<LocalDate?>(null) }
         var deleting by remember { mutableStateOf<Triple<LocalDate, Int, Instant>?>(null) }
@@ -154,19 +157,20 @@ fun OvertimeApp(vm: MainViewModel = viewModel(), todayRequest: Int = 0) {
                     drawCircle(Brush.radialGradient(listOf(if (dark) Green.copy(alpha = .08f) else Mint.copy(alpha = .75f), Color.Transparent), Offset(size.width, size.height * .12f), size.width * .9f), size.width * .9f, Offset(size.width, size.height * .12f))
                     drawCircle(Brush.radialGradient(listOf(if (dark) Color(0xFF655383).copy(alpha = .04f) else Violet.copy(alpha = .65f), Color.Transparent), Offset(0f, size.height * .55f), size.width), size.width, Offset(0f, size.height * .55f))
                 }
-                LazyColumn(Modifier.fillMaxSize().statusBarsPadding().testTag("main-page"), state = scrollPositions[tab], contentPadding = PaddingValues(start = 24.dp, end = 24.dp, top = 24.dp, bottom = 130.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+                Crossfade(tab, animationSpec = tween(GlassMotion.ContentMillis, easing = GlassMotion.Easing), label = "main-pages") { page ->
+                LazyColumn(Modifier.fillMaxSize().transitionContent(page == activeTab.value).statusBarsPadding().testTag("main-page"), state = scrollPositions[page], contentPadding = PaddingValues(start = 24.dp, end = 24.dp, top = 24.dp, bottom = 130.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
                     item {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
-                                Text("加班打卡 · " + listOf("记录今日出勤", "查看历史打卡", "统计加班时长", "按你的习惯来")[tab], color = colors.onSurfaceVariant, fontSize = 13.sp)
+                                Text("加班打卡 · " + listOf("记录今日出勤", "查看历史打卡", "统计加班时长", "按你的习惯来")[page], color = colors.onSurfaceVariant, fontSize = 13.sp)
                                 Spacer(Modifier.height(8.dp))
-                                Text(listOf("今天", "打卡记录", "时间统计", "偏好设置")[tab], fontSize = 32.sp, fontWeight = FontWeight.Bold, letterSpacing = (-1).sp)
+                                Text(listOf("今天", "打卡记录", "时间统计", "偏好设置")[page], fontSize = 32.sp, fontWeight = FontWeight.Bold, letterSpacing = (-1).sp)
                             }
                         }
                     }
                     if (!state.loaded) item { LinearProgressIndicator(Modifier.fillMaxWidth()); Text("正在读取本地记录…") }
                     state.error?.let { error -> item { GlassCard { Text(error, color = colors.error); TextButton(onClick = { tab = 3 }) { Text("前往恢复备份") } } } }
-                    when (tab) {
+                    when (page) {
                         0 -> {
                             item {
                                 GlassCard {
@@ -271,6 +275,9 @@ fun OvertimeApp(vm: MainViewModel = viewModel(), todayRequest: Int = 0) {
                             } }
                             item { GlassCard {
                                 Text("桌面上的小帮手", fontWeight = FontWeight.SemiBold)
+                                PreferenceSwitch("快捷打卡震动", "小组件与磁贴保存成功后轻震，遵循系统设置", prefs.quickPunchHaptics) { enabled ->
+                                    vm.updatePreferences { it.copy(quickPunchHaptics = enabled) }
+                                }
                                 Text("每种尺寸都以大按钮打卡和今日记录为主。\n小尺寸看最近记录，大尺寸看今日时间线；点按记录可查看今日全部打卡。\n长按桌面 → 小组件 → 加班打卡。", fontSize = 13.sp, lineHeight = 21.sp, color = colors.onSurfaceVariant, modifier = Modifier.padding(vertical = 12.dp))
                                 val widgets = listOf("2×1" to QuickAttendanceWidget::class.java, "2×2" to SmallAttendanceWidget::class.java,
                                     "3×2" to TodayAttendanceWidget::class.java, "4×1" to StripAttendanceWidget::class.java,
@@ -299,6 +306,7 @@ fun OvertimeApp(vm: MainViewModel = viewModel(), todayRequest: Int = 0) {
                         }
                     }
                 }
+                }
             }
             val navShape = RoundedCornerShape(32.dp)
             val navModifier = if (prefs.glass && !lowRam && Build.VERSION.SDK_INT >= 31) Modifier.drawBackdrop(backdrop, { navShape }, effects = { blur(18.dp.toPx()); lens(18.dp.toPx(), 24.dp.toPx()) }, onDrawSurface = { drawRect(colors.surface.copy(alpha = if (dark) .92f else .56f)) })
@@ -306,8 +314,11 @@ fun OvertimeApp(vm: MainViewModel = viewModel(), todayRequest: Int = 0) {
             Row(Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(horizontal = 24.dp, vertical = 12.dp).fillMaxWidth().then(navModifier).border(1.dp, colors.surface.copy(alpha = .7f), navShape).padding(6.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
                 val tabs = listOf(Icons.Outlined.Home to "今天", Icons.AutoMirrored.Outlined.ReceiptLong to "记录", Icons.Outlined.BarChart to "统计", Icons.Outlined.Tune to "设置")
                 tabs.forEachIndexed { index, (icon,label) ->
-                    val tint by animateColorAsState(if (tab == index) colors.primary else colors.onSurfaceVariant, label = "tab")
-                    Column(Modifier.weight(1f).clip(RoundedCornerShape(26.dp)).background(if (tab == index) colors.primary.copy(alpha = .10f) else Color.Transparent).selectable(selected = tab == index, role = Role.Tab) { tab = index }.padding(vertical = 10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    val tint by animateColorAsState(if (tab == index) colors.primary else colors.onSurfaceVariant,
+                        animationSpec = tween(GlassMotion.ContentMillis, easing = GlassMotion.Easing), label = "tab")
+                    val selection by animateColorAsState(if (tab == index) colors.primary.copy(alpha = .10f) else Color.Transparent,
+                        animationSpec = tween(GlassMotion.ContentMillis, easing = GlassMotion.Easing), label = "tab-selection")
+                    Column(Modifier.weight(1f).clip(RoundedCornerShape(26.dp)).background(selection).selectable(selected = tab == index, role = Role.Tab) { tab = index }.padding(vertical = 10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(icon, label, tint = tint, modifier = Modifier.size(23.dp)); Spacer(Modifier.height(3.dp)); Text(label, fontSize = 11.sp, color = tint, fontWeight = FontWeight.Medium)
                     }
                 }
@@ -321,23 +332,23 @@ fun OvertimeApp(vm: MainViewModel = viewModel(), todayRequest: Int = 0) {
                     val (date, index, instant) = deleting!!
                     GlassConfirmation("删除这次打卡？", "将移除 $date 的第 ${index + 1} 次打卡。修改前副本会保留在本机。",
                         "删除打卡", destructive = true, backdrop = backdrop, glass = glass,
-                        onDismiss = { deleting = null }, onConfirm = { vm.remove(date, index, instant); deleting = null })
+                        onDismiss = { deleting = null }, onConfirm = { vm.remove(date, index, instant) })
                 }
                 recovering -> GlassConfirmation("恢复最近副本？", "当前记录将回退到最近一次修改前。恢复前建议先导出当前完整备份。",
                     "恢复副本", backdrop = backdrop, glass = glass,
-                    onDismiss = { recovering = false }, onConfirm = { vm.recover(); recovering = false })
+                    onDismiss = { recovering = false }, onConfirm = { vm.recover() })
                 adding -> AddPunchSheet(backdrop, glass, prefs, now, onDismiss = { adding = false },
-                    onSave = { d, t -> vm.add(d, t); adding = false })
+                    onSave = { d, t -> vm.add(d, t) })
                 choosingCutoff -> CutoffSheet(prefs.cutoff, backdrop, glass, prefs,
                     onDismiss = { choosingCutoff = false },
-                    onSave = { time -> vm.updatePreferences { it.copy(cutoff = time) }; choosingCutoff = false })
+                    onSave = { time -> vm.updatePreferences { it.copy(cutoff = time) } })
                 selected != null -> {
                     val date = selected!!
                     val record = state.records.find { it.date == date }
-                    GlassSheet(date.format(dayFormat), backdrop, glass, onDismiss = { selected = null }, listContent = {
+                    GlassSheet(date.format(dayFormat), backdrop, glass, onDismiss = { selected = null }, listContent = { close ->
                         if (record?.punches.isNullOrEmpty()) item { Text("当天已无打卡") }
                         itemsIndexed(record?.punches.orEmpty()) { index, instant ->
-                            PunchRow(index, instant, busy) { deleting = Triple(date, index, instant) }
+                            PunchRow(index, instant, busy) { close { deleting = Triple(date, index, instant) } }
                         }
                     }) {}
                 }

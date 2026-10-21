@@ -10,7 +10,10 @@ import com.liu.overtime.ui.MainViewModel
 import com.liu.overtime.ui.OvertimeApp
 import com.liu.overtime.ui.Preferences
 import com.liu.overtime.widget.PinOutcome
+import com.liu.overtime.widget.WidgetPinRequests
 import org.junit.Assert.*
+import org.junit.After
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -37,6 +40,12 @@ class SilentPinLauncherShadow : ShadowAppWidgetManager() {
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class WidgetPinFlowTest {
     @get:Rule val compose = createAndroidComposeRule<androidx.activity.ComponentActivity>()
+
+    @Before @After fun isolateLauncherSingleton() {
+        // Robolectric can retain application statics between sandboxes. This test's silent launcher
+        // must neither reuse an earlier AppWidgetManager nor leak into the next test application.
+        WidgetPinRequests::class.java.getDeclaredField("instance").apply { isAccessible = true }.set(null, null)
+    }
 
     @Test fun ignoredRequestWaitsUntilForegroundThenShowsGuideOnceWithoutChangingRecords() {
         // Own this test's Application; AndroidViewModelFactory caches applications across Robolectric sandboxes.

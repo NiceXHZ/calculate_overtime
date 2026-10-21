@@ -1,6 +1,8 @@
 package com.liu.overtime.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -38,18 +40,19 @@ internal fun AddPunchSheet(
     var dateText by rememberSaveable { mutableStateOf(now.toLocalDate().toString()) }
     var timeText by rememberSaveable { mutableStateOf(now.toLocalTime().withSecond(0).withNano(0).toString()) }
     var mode by rememberSaveable { mutableIntStateOf(1) }
-    var moving by remember { mutableStateOf(false) }
+    val activeMode = rememberUpdatedState(mode)
+    val moving = remember { mutableStateMapOf(0 to false, 1 to false) }
     val date = LocalDate.parse(dateText)
     val time = LocalTime.parse(timeText)
     val future = date.atTime(time).atZone(WorkZone).toInstant().isAfter(now.toInstant())
     val feedback = rememberPickerFeedback(preferences.pickerSound, preferences.pickerHaptics)
     val configuration = LocalConfiguration.current
     val compact = configuration.screenHeightDp < 500 && configuration.screenWidthDp > 500
-    GlassSheet("补录打卡", backdrop, glass, onDismiss, footer = {
+    GlassSheet("补录打卡", backdrop, glass, onDismiss, footer = { close ->
         Text(if (future) "请选择已经发生的时间" else "北京时间 · 精确到分钟",
             fontSize = 13.sp, color = if (future) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.align(Alignment.CenterHorizontally))
-        Button(onClick = { onSave(date, time) }, enabled = !future && !moving,
+        Button(onClick = { close.commit({ onSave(date, time) }, onDismiss) }, enabled = !future && moving.values.none { it },
             modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp), shape = RoundedCornerShape(22.dp)) {
             Text("保存打卡", fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
         }
@@ -58,8 +61,13 @@ internal fun AddPunchSheet(
             PunchFields(date, time, mode, compact) { mode = it }
         }
         val wheels: @Composable () -> Unit = {
-            if (mode == 0) DateWheels(date, now.toLocalDate(), feedback, { moving = it }, compact) { dateText = it.toString() }
-            else TimeWheels(time, feedback, { moving = it }, compact) { timeText = it.toString() }
+            Crossfade(mode, animationSpec = tween(GlassMotion.ContentMillis, easing = GlassMotion.Easing), label = "punch-picker") { picker ->
+                Box(Modifier.transitionContent(picker == activeMode.value)) {
+                // Each outgoing wheel owns its busy state until disposal; it cannot unlock the incoming wheel.
+                if (picker == 0) DateWheels(date, now.toLocalDate(), feedback, { moving[0] = it }, compact) { dateText = it.toString() }
+                else TimeWheels(time, feedback, { moving[1] = it }, compact) { timeText = it.toString() }
+                }
+            }
         }
         if (compact) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -122,8 +130,8 @@ internal fun CutoffSheet(
     val time = LocalTime.parse(timeText)
     val feedback = rememberPickerFeedback(preferences.pickerSound, preferences.pickerHaptics)
     val compact = LocalConfiguration.current.screenHeightDp < 500
-    GlassSheet("工作日下班时间", backdrop, glass, onDismiss, footer = {
-        Button(onClick = { onSave(time) }, enabled = !moving, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+    GlassSheet("工作日下班时间", backdrop, glass, onDismiss, footer = { close ->
+        Button(onClick = { close.commit({ onSave(time) }, onDismiss) }, enabled = !moving, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
             shape = RoundedCornerShape(22.dp)) { Text("完成", fontSize = 17.sp, fontWeight = FontWeight.SemiBold) }
     }) {
         Text("工作日从这个时间开始计算加班", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)

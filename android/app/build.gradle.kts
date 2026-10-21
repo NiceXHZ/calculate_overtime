@@ -17,8 +17,8 @@ android {
         applicationId = "com.liu.overtime"
         minSdk = 26
         targetSdk = 36
-        versionCode = 8
-        versionName = "0.3.3"
+        versionCode = 9
+        versionName = "0.3.4"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         resourceConfigurations += listOf("zh", "en")
     }

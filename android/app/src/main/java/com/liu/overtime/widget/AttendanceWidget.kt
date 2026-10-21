@@ -6,14 +6,12 @@ import android.appwidget.AppWidgetProvider
 import android.content.*
 import android.os.Bundle
 import android.widget.RemoteViews
-import android.widget.Toast
 import com.liu.overtime.MainActivity
 import com.liu.overtime.R
 import com.liu.overtime.data.*
 import com.liu.overtime.domain.*
 import kotlinx.coroutines.*
 import java.time.*
-import java.time.format.DateTimeFormatter
 
 private val widgetScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -91,11 +89,15 @@ class ClockChangeReceiver : BroadcastReceiver() {
     }
 }
 
-suspend fun recordFromOutside(context: Context) {
-    val message = try {
-        val result = RecordStore.get(context).punch()
-        AttendanceWidget.updateAll(context)
-        if (result.added) "打卡已保存 · ${result.instant.atZone(WorkZone).format(DateTimeFormatter.ofPattern("HH:mm:ss"))}" else RecordStore.DUPLICATE_NOTICE
-    } catch (e: Exception) { "打卡未保存：${e.message}" }
-    withContext(Dispatchers.Main) { Toast.makeText(context, message, Toast.LENGTH_SHORT).show() }
+suspend fun recordFromOutside(context: Context) = withContext(Dispatchers.IO) {
+    val app = context.applicationContext
+    val outcome = try {
+        QuickPunchOutcome.from(RecordStore.get(app).punch())
+    } catch (e: CancellationException) { throw e }
+    catch (e: Exception) { QuickPunchOutcome.failed(e) }
+    // Once the synchronous save returns, complete its acknowledgement even if the tile is destroyed.
+    withContext(NonCancellable) {
+        withContext(Dispatchers.Main) { QuickPunchFeedback.show(app, outcome) }
+        AttendanceWidget.updateAll(app)
+    }
 }

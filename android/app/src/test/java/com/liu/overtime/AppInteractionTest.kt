@@ -18,6 +18,33 @@ import java.io.File
 class AppInteractionTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
 
+    @Test fun outgoingTodayPageCannotPunchWhileRecordsPageIsFadingIn() {
+        val store = RecordStore.get(compose.activity)
+        compose.waitUntil(15_000) { store.state.value.loaded }
+        val before = store.state.value.records.sumOf { it.punches.size }
+        val oldPunchPosition = compose.onNodeWithText("记录打卡").fetchSemanticsNode().boundsInRoot.center
+        compose.mainClock.autoAdvance = false
+        compose.onNodeWithText("记录").performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick) { it() }
+        compose.mainClock.advanceTimeBy(32)
+        compose.waitForIdle()
+        compose.mainClock.advanceTimeBy(64)
+        compose.waitForIdle()
+        compose.onNodeWithContentDescription("记录").assertIsSelected()
+        // The new page is mostly empty at this location. Its outgoing predecessor is still visible.
+        compose.onRoot().performTouchInput { click(oldPunchPosition) }
+        compose.mainClock.advanceTimeBy(600)
+        compose.waitForIdle()
+        compose.runOnIdle { assertEquals(before, store.state.value.records.sumOf { it.punches.size }) }
+        compose.onNodeWithText("打卡记录").assertIsDisplayed()
+        compose.onNodeWithContentDescription("今天").performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick) { it() }
+        compose.mainClock.advanceTimeBy(32)
+        compose.waitForIdle()
+        compose.mainClock.advanceTimeBy(600)
+        compose.waitForIdle()
+        compose.onNodeWithText("记录打卡").assertIsDisplayed().assertIsEnabled()
+        compose.mainClock.autoAdvance = true
+    }
+
     @Test fun punchUndoAndNavigateAllFourScreens() {
         val store = RecordStore.get(compose.activity)
         compose.waitUntil(15_000) { store.state.value.loaded }
@@ -128,6 +155,14 @@ class AppInteractionTest {
             val saved = vm.getApplication<android.app.Application>().getSharedPreferences("preferences", 0)
             assertFalse(saved.all.toString(), saved.getBoolean("pickerSound", true))
             assertFalse(saved.all.toString(), saved.getBoolean("pickerHaptics", true))
+        }
+        compose.onNodeWithTag("main-page").performScrollToNode(hasContentDescription("快捷打卡震动"))
+        compose.onNodeWithContentDescription("快捷打卡震动")
+            .performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick) { it() }
+        compose.runOnIdle {
+            assertFalse(vm.preferences.value.quickPunchHaptics)
+            assertFalse(vm.getApplication<android.app.Application>().getSharedPreferences("preferences", 0)
+                .getBoolean(com.liu.overtime.widget.QuickPunchFeedback.PreferenceKey, true))
         }
     }
 

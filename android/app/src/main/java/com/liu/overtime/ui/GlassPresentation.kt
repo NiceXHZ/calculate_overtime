@@ -3,7 +3,8 @@ package com.liu.overtime.ui
 import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -30,6 +31,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -42,6 +45,28 @@ import com.kyant.backdrop.drawBackdrop
 import com.kyant.backdrop.effects.blur
 import com.kyant.backdrop.effects.lens
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
+
+internal object GlassMotion {
+    const val PanelMillis = 480
+    const val ContentMillis = 320
+    const val ReboundMillis = 360
+    val Easing = CubicBezierEasing(.32f, 0f, .24f, 1f)
+}
+
+/** Keep data commits immediate, while dismissals and replacements wait for the outgoing sheet. */
+internal class SheetClose(private val request: (() -> Unit, () -> Unit) -> Unit) {
+    operator fun invoke(afterClose: () -> Unit) = request({}, afterClose)
+    fun commit(action: () -> Unit, onClosed: () -> Unit) = request(action, onClosed)
+}
+
+/** A fading-out page must not expose stale controls through empty areas of its replacement. */
+internal fun Modifier.transitionContent(active: Boolean): Modifier =
+    if (active) this else this.semantics { hideFromAccessibility() }.pointerInput(Unit) {
+        awaitPointerEventScope {
+            while (true) awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() }
+        }
+    }
 
 /** A single-window presentation keeps the sampled backdrop aligned with the sheet.
  *  There is deliberately no partial-expansion anchor: actions are visible on opening.
@@ -52,9 +77,9 @@ internal fun GlassSheet(
     backdrop: Backdrop,
     glass: Boolean,
     onDismiss: () -> Unit,
-    footer: @Composable ColumnScope.() -> Unit = {},
-    listContent: (LazyListScope.() -> Unit)? = null,
-    content: @Composable ColumnScope.() -> Unit,
+    footer: @Composable ColumnScope.(SheetClose) -> Unit = {},
+    listContent: (LazyListScope.(SheetClose) -> Unit)? = null,
+    content: @Composable ColumnScope.(SheetClose) -> Unit,
 ) {
     val colors = MaterialTheme.colorScheme
     val dark = colors.surface.luminance() < .2f
@@ -63,22 +88,31 @@ internal fun GlassSheet(
     val scope = rememberCoroutineScope()
     val entry = remember { Animatable(1f) }
     var drag by remember { mutableFloatStateOf(0f) }
+    var panelHeight by remember { mutableIntStateOf(0) }
+    var reboundJob by remember { mutableStateOf<Job?>(null) }
     var closing by remember { mutableStateOf(false) }
     val currentDismiss by rememberUpdatedState(onDismiss)
-    val dismiss: () -> Unit = {
+    val close = SheetClose { beforeClose, afterClose ->
         if (!closing) {
             closing = true
+            reboundJob?.cancel()
+            beforeClose()
             scope.launch {
-                entry.animateTo(1f, spring(stiffness = 450f))
-                currentDismiss()
+                entry.animateTo(1f, tween(GlassMotion.PanelMillis, easing = GlassMotion.Easing))
+                afterClose()
             }
         }
     }
-    LaunchedEffect(Unit) { entry.animateTo(0f, spring(dampingRatio = .88f, stiffness = 380f)) }
+    val dismiss: () -> Unit = { close { currentDismiss() } }
+    LaunchedEffect(Unit) { entry.animateTo(0f, tween(GlassMotion.PanelMillis, easing = GlassMotion.Easing)) }
     BackHandler(onBack = dismiss)
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        val travel = with(density) { maxHeight.toPx() }
-        Box(Modifier.fillMaxSize().graphicsLayer { alpha = 1f - entry.value }
+        val bottomInset = WindowInsets.safeDrawing.union(WindowInsets.ime).getBottom(density)
+        val travel = if (panelHeight > 0) panelHeight + bottomInset + with(density) { 20.dp.toPx() }
+            else with(density) { maxHeight.toPx() }
+        Box(Modifier.fillMaxSize().graphicsLayer {
+                alpha = ((1f - entry.value) * (1f - drag / travel)).coerceIn(0f, 1f)
+            }
             .background(Color.Black.copy(alpha = if (dark) .45f else .22f))
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = dismiss)
             .semantics { contentDescription = "关闭弹层遮罩" })
@@ -94,20 +128,27 @@ internal fun GlassSheet(
             } else Modifier.background(colors.surface, shape)
             Column(Modifier.align(Alignment.BottomCenter).widthIn(max = 560.dp).fillMaxWidth()
                 .heightIn(max = maxHeight)
-                .graphicsLayer { translationY = entry.value * travel + drag }
+                .onSizeChanged { panelHeight = it.height }
+                .graphicsLayer { translationY = entry.value * travel + drag * (1f - entry.value) }
                 .shadow(24.dp, shape, clip = false).then(material).clip(shape)
                 .border(.8.dp, if (dark) colors.outlineVariant else Color.White.copy(alpha = .85f), shape)
                 // Consume taps within the panel instead of passing through to the dimmed page.
                 .pointerInput(Unit) { detectTapGestures {} }
+                .testTag("glass-sheet")
                 .semantics { paneTitle = title; isTraversalGroup = true; dialog(); dismiss { dismiss(); true } }) {
-                Column(Modifier.fillMaxWidth().draggable(
+                Column(Modifier.fillMaxWidth().testTag("sheet-drag-handle").draggable(
+                    enabled = !closing,
                     orientation = Orientation.Vertical,
                     state = rememberDraggableState { drag = (drag + it).coerceAtLeast(0f) },
+                    onDragStarted = { reboundJob?.cancel() },
                     onDragStopped = { velocity ->
-                        if (drag > with(density) { 72.dp.toPx() } || velocity > 1200f) dismiss()
+                        if (drag > with(density) { 72.dp.toPx() } ||
+                            (drag >= with(density) { 28.dp.toPx() } && velocity > 1200f)) dismiss()
                         else {
-                            val rebound = Animatable(drag)
-                            rebound.animateTo(0f, spring()) { drag = value }
+                            reboundJob = scope.launch {
+                                Animatable(drag).animateTo(0f,
+                                    tween(GlassMotion.ReboundMillis, easing = GlassMotion.Easing)) { drag = value }
+                            }
                         }
                     },
                 )) {
@@ -116,19 +157,19 @@ internal fun GlassSheet(
                     Row(Modifier.fillMaxWidth().padding(start = 24.dp, end = 14.dp, top = 6.dp, bottom = 10.dp),
                         verticalAlignment = Alignment.CenterVertically) {
                         Text(title, color = colors.onSurface, fontSize = 22.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                        IconButton(onClick = dismiss, modifier = Modifier.size(44.dp)
+                        IconButton(onClick = dismiss, enabled = !closing, modifier = Modifier.size(44.dp)
                             .background(colors.onSurface.copy(alpha = .06f), CircleShape)) {
                             Icon(Icons.Outlined.Close, "关闭$title", tint = colors.onSurface, modifier = Modifier.size(20.dp))
                         }
                     }
                 }
                 if (listContent != null) LazyColumn(Modifier.weight(1f, fill = false).fillMaxWidth().testTag("sheet-record-list"),
-                    contentPadding = PaddingValues(horizontal = 24.dp), content = listContent)
+                    contentPadding = PaddingValues(horizontal = 24.dp), content = { listContent(close) })
                 else Column(Modifier.weight(1f, fill = false).fillMaxWidth()
-                    .verticalScroll(rememberScrollState()).padding(horizontal = 24.dp), content = content)
+                    .verticalScroll(rememberScrollState()).padding(horizontal = 24.dp)) { content(close) }
                 Column(Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp,
                     top = if (compact) 8.dp else 12.dp, bottom = if (compact) 12.dp else 20.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp), content = footer)
+                    verticalArrangement = Arrangement.spacedBy(10.dp)) { footer(close) }
             }
         }
     }
@@ -145,12 +186,12 @@ internal fun GlassConfirmation(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
 ) {
-    GlassSheet(title, backdrop, glass, onDismiss, footer = {
-        Button(onClick = onConfirm, modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp),
+    GlassSheet(title, backdrop, glass, onDismiss, footer = { close ->
+        Button(onClick = { close.commit(onConfirm, onDismiss) }, modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp),
             shape = RoundedCornerShape(22.dp),
             colors = if (destructive) ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                 else ButtonDefaults.buttonColors()) { Text(confirm, fontSize = 17.sp, fontWeight = FontWeight.SemiBold) }
-        TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("取消", fontSize = 16.sp) }
+        TextButton(onClick = { close(onDismiss) }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("取消", fontSize = 16.sp) }
     }) {
         Text(message, fontSize = 16.sp, lineHeight = 25.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }

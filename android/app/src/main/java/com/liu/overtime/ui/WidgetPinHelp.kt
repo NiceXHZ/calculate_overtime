@@ -53,8 +53,8 @@ internal fun WidgetPinHelpSheet(
         catch (_: ActivityNotFoundException) { Toast.makeText(context, "未找到浏览器", Toast.LENGTH_SHORT).show() }
     }
     if (expanded && xiaomi) {
-        GlassSheet("小米官方添加流程", backdrop, glass, onDismiss = { expanded = false }, footer = {
-            Button(onClick = { expanded = false }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("返回提示") }
+        GlassSheet("小米官方添加流程", backdrop, glass, onDismiss = { expanded = false }, footer = { close ->
+            Button(onClick = { close { expanded = false } }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("返回提示") }
         }) {
             Text("双指缩放、拖动查看，或使用下方缩放按钮。", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(10.dp))
@@ -62,9 +62,9 @@ internal fun WidgetPinHelpSheet(
         }
     } else {
         val title = if (state.outcome == PinOutcome.UNAVAILABLE) "请从桌面添加" else "尚未确认添加成功"
-        GlassSheet(title, backdrop, glass, onDismiss, footer = {
-            Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("知道了") }
-        }) {
+        GlassSheet(title, backdrop, glass, onDismiss, footer = { close ->
+            Button(onClick = { close(onDismiss) }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("知道了") }
+        }) { close ->
             Text(if (state.outcome == PinOutcome.UNAVAILABLE) "当前桌面未接受快捷添加请求，可以手动添加 ${state.size} 小组件。"
                 else "还没有确认 ${state.size} 小组件已添加。若桌面仍有确认窗口，请先完成操作；也可以按下面的方法手动添加。",
                 fontSize = 15.sp, lineHeight = 23.sp, color = MaterialTheme.colorScheme.onSurface)
@@ -74,7 +74,7 @@ internal fun WidgetPinHelpSheet(
                 fontSize = 14.sp, lineHeight = 22.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (xiaomi) {
                 Spacer(Modifier.height(16.dp))
-                Box(Modifier.fillMaxWidth().clickable(onClickLabel = "放大小米官方添加流程") { expanded = true }
+                Box(Modifier.fillMaxWidth().clickable(onClickLabel = "放大小米官方添加流程") { close { expanded = true } }
                     .testTag("xiaomi-guide-thumbnail").background(Color.White)) {
                     OfficialGuideImage(false, Modifier.fillMaxWidth().aspectRatio(2880f / 1618f))
                 }

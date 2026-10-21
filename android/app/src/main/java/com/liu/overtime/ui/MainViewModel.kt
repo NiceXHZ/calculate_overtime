@@ -8,6 +8,7 @@ import com.liu.overtime.data.*
 import com.liu.overtime.domain.*
 import com.liu.overtime.widget.AttendanceWidget
 import com.liu.overtime.widget.WidgetPinRequests
+import com.liu.overtime.widget.QuickPunchFeedback
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.sync.Mutex
@@ -20,6 +21,7 @@ data class Preferences(
     val dark: String = "system",
     val pickerSound: Boolean = true,
     val pickerHaptics: Boolean = true,
+    val quickPunchHaptics: Boolean = true,
 )
 data class Notice(val text: String, val undo: Instant? = null, val undoRevision: Long? = null)
 data class MonthSummary(val month: YearMonth, val days: List<DaySummary>)
@@ -34,7 +36,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val mutablePrefs = MutableStateFlow(Preferences(
         runCatching { LocalTime.parse(shared.getString("cutoff", "17:30")) }.getOrDefault(LocalTime.of(17,30)),
         shared.getBoolean("glass", true), shared.getString("dark", "system") ?: "system",
-        shared.getBoolean("pickerSound", true), shared.getBoolean("pickerHaptics", true)))
+        shared.getBoolean("pickerSound", true), shared.getBoolean("pickerHaptics", true),
+        shared.getBoolean(QuickPunchFeedback.PreferenceKey, true)))
     val preferences = mutablePrefs.asStateFlow()
     val month = MutableStateFlow(YearMonth.now(WorkZone))
     // No timer work while the UI has no lifecycle-active collectors.
@@ -144,7 +147,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (previous == value) return
         mutablePrefs.value = value
         shared.edit().putString("cutoff", value.cutoff.toString()).putBoolean("glass", value.glass).putString("dark", value.dark)
-            .putBoolean("pickerSound", value.pickerSound).putBoolean("pickerHaptics", value.pickerHaptics).apply()
+            .putBoolean("pickerSound", value.pickerSound).putBoolean("pickerHaptics", value.pickerHaptics)
+            .putBoolean(QuickPunchFeedback.PreferenceKey, value.quickPunchHaptics).apply()
         if (previous.dark != value.dark) viewModelScope.launch(Dispatchers.IO) { AttendanceWidget.updateAll(context) }
     }
     fun updatePreferences(transform: (Preferences) -> Preferences) = updatePreferences(transform(preferences.value))
