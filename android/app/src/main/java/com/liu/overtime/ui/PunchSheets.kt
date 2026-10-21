@@ -53,7 +53,7 @@ internal fun AddPunchSheet(
             fontSize = 13.sp, color = if (future) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.align(Alignment.CenterHorizontally))
         Button(onClick = { close.commit({ onSave(date, time) }, onDismiss) }, enabled = !future && moving.values.none { it },
-            modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp), shape = RoundedCornerShape(22.dp)) {
+            modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp), shape = RoundedCornerShape(18.dp)) {
             Text("保存打卡", fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
         }
     }) {
@@ -132,7 +132,7 @@ internal fun CutoffSheet(
     val compact = LocalConfiguration.current.screenHeightDp < 500
     GlassSheet("工作日下班时间", backdrop, glass, onDismiss, footer = { close ->
         Button(onClick = { close.commit({ onSave(time) }, onDismiss) }, enabled = !moving, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
-            shape = RoundedCornerShape(22.dp)) { Text("完成", fontSize = 17.sp, fontWeight = FontWeight.SemiBold) }
+            shape = RoundedCornerShape(18.dp)) { Text("完成", fontSize = 17.sp, fontWeight = FontWeight.SemiBold) }
     }) {
         Text("工作日从这个时间开始计算加班", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         TimeWheels(time, feedback, { moving = it }, compact) { timeText = it.toString() }

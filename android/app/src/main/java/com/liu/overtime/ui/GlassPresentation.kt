@@ -28,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.pointer.pointerInput
@@ -125,13 +126,16 @@ internal fun GlassSheet(
                 }, onDrawSurface = {
                     drawRect(colors.surface.copy(alpha = if (dark) .92f else .78f))
                 })
-            } else Modifier.background(colors.surface, shape)
+            } else Modifier.background(Brush.linearGradient(listOf(colors.surface, colors.surfaceContainerLow)), shape)
             Column(Modifier.align(Alignment.BottomCenter).widthIn(max = 560.dp).fillMaxWidth()
                 .heightIn(max = maxHeight)
                 .onSizeChanged { panelHeight = it.height }
                 .graphicsLayer { translationY = entry.value * travel + drag * (1f - entry.value) }
-                .shadow(24.dp, shape, clip = false).then(material).clip(shape)
-                .border(.8.dp, if (dark) colors.outlineVariant else Color.White.copy(alpha = .85f), shape)
+                .shadow(20.dp, shape, clip = false,
+                    ambientColor = Color.Black.copy(alpha = .12f), spotColor = Color.Black.copy(alpha = .12f))
+                .then(material).clip(shape)
+                .border(1.dp, Brush.linearGradient(if (dark) listOf(colors.outlineVariant, colors.outlineVariant.copy(alpha = .4f))
+                    else listOf(Color.White, colors.outlineVariant.copy(alpha = .55f))), shape)
                 // Consume taps within the panel instead of passing through to the dimmed page.
                 .pointerInput(Unit) { detectTapGestures {} }
                 .testTag("glass-sheet")
@@ -156,7 +160,7 @@ internal fun GlassSheet(
                         .size(34.dp, 5.dp).background(colors.onSurfaceVariant.copy(alpha = .28f), CircleShape))
                     Row(Modifier.fillMaxWidth().padding(start = 24.dp, end = 14.dp, top = 6.dp, bottom = 10.dp),
                         verticalAlignment = Alignment.CenterVertically) {
-                        Text(title, color = colors.onSurface, fontSize = 22.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                        Text(title, color = colors.onSurface, fontSize = 21.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-.5).sp, modifier = Modifier.weight(1f))
                         IconButton(onClick = dismiss, enabled = !closing, modifier = Modifier.size(44.dp)
                             .background(colors.onSurface.copy(alpha = .06f), CircleShape)) {
                             Icon(Icons.Outlined.Close, "关闭$title", tint = colors.onSurface, modifier = Modifier.size(20.dp))
@@ -188,7 +192,7 @@ internal fun GlassConfirmation(
 ) {
     GlassSheet(title, backdrop, glass, onDismiss, footer = { close ->
         Button(onClick = { close.commit(onConfirm, onDismiss) }, modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp),
-            shape = RoundedCornerShape(22.dp),
+            shape = RoundedCornerShape(18.dp),
             colors = if (destructive) ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                 else ButtonDefaults.buttonColors()) { Text(confirm, fontSize = 17.sp, fontWeight = FontWeight.SemiBold) }
         TextButton(onClick = { close(onDismiss) }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("取消", fontSize = 16.sp) }
