@@ -160,7 +160,9 @@ test("home-screen safe areas keep the full app name and controls clear in portra
       { top, side, bottom },
     );
     expect(
-      await page.evaluate(() => document.documentElement.scrollWidth - innerWidth),
+      await page.evaluate(
+        () => document.documentElement.scrollWidth - innerWidth,
+      ),
     ).toBeLessThanOrEqual(1);
     await insideViewport(page, ".topbar");
     await insideViewport(page, ".action-dock");
@@ -453,7 +455,7 @@ test("keyboard focus, glass fallback and contrast pass accessibility checks in b
   await page.locator("#settingsDone").click();
   await expect(page.locator("html")).toHaveAttribute("data-glass", "off");
   await page.locator("#dockAdd").click();
-  await expect(page.locator("#newDate")).toBeFocused();
+  await expect(page.locator("#editorTitle")).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(page.locator("#dockAdd")).toBeFocused();
 });

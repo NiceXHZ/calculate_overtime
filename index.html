@@ -29,6 +29,7 @@
     <script src="./web/holidays.js" defer></script>
     <script src="./web/holiday-service.js" defer></script>
     <script src="./web/glass.js" defer></script>
+    <script src="./web/sheets.js" defer></script>
     <script src="./web/app.js" defer></script>
   </head>
   <body>
@@ -471,7 +472,7 @@
         <header class="sheet-heading">
           <div>
             <p class="eyebrow">按月回看</p>
-            <h2 id="monthTitle">选择月份</h2>
+            <h2 id="monthTitle" tabindex="-1" autofocus>选择月份</h2>
           </div>
           <button
             class="icon-button"
@@ -522,7 +523,7 @@
         <header class="sheet-heading">
           <div>
             <p class="eyebrow">补上遗漏的时刻</p>
-            <h2 id="editorTitle">补录打卡</h2>
+            <h2 id="editorTitle" tabindex="-1" autofocus>补录打卡</h2>
           </div>
           <button
             class="icon-button"
@@ -543,7 +544,6 @@
                   type="date"
                   id="newDate"
                   required
-                  autofocus
                   aria-describedby="punchError" /></label
               ><label class="picker-field"
                 >时间<input
@@ -600,7 +600,7 @@
         <header class="sheet-heading">
           <div>
             <p class="eyebrow" id="deleteSubtitle"></p>
-            <h2 id="deleteTitle">当天记录</h2>
+            <h2 id="deleteTitle" tabindex="-1" autofocus>当天记录</h2>
           </div>
           <button
             class="icon-button"
@@ -643,7 +643,7 @@
         <header class="sheet-heading">
           <div>
             <p class="eyebrow">按你的习惯来</p>
-            <h2 id="settingsTitle">偏好设置</h2>
+            <h2 id="settingsTitle" tabindex="-1" autofocus>偏好设置</h2>
           </div>
           <button
             class="icon-button"
@@ -715,7 +715,7 @@
       <div class="sheet-panel">
         <div class="sheet-handle" aria-hidden="true"></div>
         <header class="sheet-heading">
-          <h2 id="confirmTitle">确认操作</h2>
+          <h2 id="confirmTitle" tabindex="-1" autofocus>确认操作</h2>
           <button
             class="icon-button"
             data-close="confirmOverlay"

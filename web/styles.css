@@ -1,4 +1,9 @@
 :root {
+  --motion-panel-duration: 480ms;
+  --motion-content-duration: 280ms;
+  --motion-rebound-duration: 360ms;
+  --motion-feedback-duration: 220ms;
+  --motion-panel-easing: cubic-bezier(0.32, 0, 0.24, 1);
   color-scheme: light;
   --page: #f3f5f4;
   --ink: #192e28;
@@ -10,6 +15,7 @@
   --on-accent: #fff;
   --surface: rgba(255, 255, 255, 0.72);
   --surface-solid: #fff;
+  --sheet-surface: rgba(255, 255, 255, 0.94);
   --surface-soft: rgba(237, 243, 239, 0.74);
   --line: rgba(58, 86, 70, 0.13);
   --rim: rgba(255, 255, 255, 0.92);
@@ -55,6 +61,7 @@
   --on-accent: #133022;
   --surface: rgba(29, 44, 37, 0.88);
   --surface-solid: #1c2b24;
+  --sheet-surface: rgba(28, 43, 36, 0.96);
   --surface-soft: rgba(36, 55, 45, 0.86);
   --line: rgba(187, 217, 195, 0.16);
   --rim: rgba(200, 236, 212, 0.18);
@@ -135,6 +142,9 @@ input:focus-visible,
 select:focus-visible {
   outline: 3px solid var(--accent);
   outline-offset: 4px;
+}
+:root[data-input="pointer"] .sheet button:focus-visible {
+  outline: none;
 }
 button {
   border: 0;
@@ -385,8 +395,8 @@ button {
   color: var(--secondary);
   flex-shrink: 0;
   transition:
-    background 0.18s,
-    transform 0.18s;
+    background var(--motion-feedback-duration),
+    transform var(--motion-feedback-duration);
 }
 .icon-button:hover {
   background: var(--surface-soft);
@@ -505,9 +515,9 @@ h1 .heading-dot {
   font-size: 13px;
   white-space: nowrap;
   transition:
-    background 0.18s,
-    transform 0.18s,
-    box-shadow 0.18s;
+    background var(--motion-feedback-duration),
+    transform var(--motion-feedback-duration),
+    box-shadow var(--motion-feedback-duration);
   line-height: 1.4;
 }
 .button .icon {
@@ -558,8 +568,8 @@ h1 .heading-dot {
   border-radius: 24px;
   margin-bottom: 22px;
   transition:
-    border-color 0.2s,
-    box-shadow 0.2s;
+    border-color var(--motion-feedback-duration),
+    box-shadow var(--motion-feedback-duration);
 }
 .import-card.dragover {
   outline: 3px solid var(--accent);
@@ -999,7 +1009,7 @@ h1 .heading-dot {
   max-width: 24px;
   min-height: 3px;
   border-radius: 5px 5px 3px 3px;
-  transition: height 0.3s;
+  transition: height var(--motion-content-duration);
 }
 .week-bar__fill.is-max {
   background: var(--accent);
@@ -1152,17 +1162,16 @@ h1 .heading-dot {
 }
 .day-card {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.1fr) minmax(
-      90px,
-      0.8fr
-    ) 20px;
+  grid-template-columns:
+    minmax(0, 1.2fr) minmax(0, 1.1fr) minmax(90px, 0.8fr)
+    20px;
   align-items: center;
   gap: 20px;
   width: 100%;
   text-align: left;
   border-top: 1px solid var(--line);
   padding: 17px 1px;
-  transition: background 0.15s;
+  transition: background var(--motion-feedback-duration);
   border-radius: 0;
   color: var(--ink);
 }
@@ -1428,13 +1437,14 @@ h1 .heading-dot {
   color: var(--surface-solid);
 }
 .sheet {
+  transform: translateY(var(--sheet-offset, 0px));
   width: calc(100% - 32px);
   max-width: 540px;
   max-height: calc(100dvh - 40px);
   padding: 0;
   border: 1px solid var(--rim);
   border-radius: 30px;
-  background: var(--surface);
+  background: var(--sheet-surface);
   color: var(--ink);
   box-shadow:
     0 22px 80px rgba(7, 34, 20, 0.22),
@@ -1442,8 +1452,17 @@ h1 .heading-dot {
   overflow: hidden;
   -webkit-backdrop-filter: blur(32px) saturate(1.2);
   backdrop-filter: blur(32px) saturate(1.2);
+  transition:
+    transform var(--motion-panel-duration) var(--motion-panel-easing),
+    background-color var(--motion-content-duration),
+    color var(--motion-content-duration);
+}
+.sheet[data-underlay="true"] {
+  transform: translateY(-12px) scale(0.97);
 }
 .sheet::backdrop {
+  opacity: var(--sheet-shade, 1);
+  transition: opacity var(--motion-panel-duration) var(--motion-panel-easing);
   background: rgba(18, 37, 27, 0.28);
   -webkit-backdrop-filter: blur(5px);
   backdrop-filter: blur(5px);
@@ -1451,17 +1470,35 @@ h1 .heading-dot {
 [data-theme="dark"] .sheet::backdrop {
   background: rgba(0, 7, 3, 0.52);
 }
-.sheet[open] {
-  animation: sheetEnter 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+.sheet[data-phase="entering"]::backdrop {
+  animation: sheetBackdropEnter var(--motion-panel-duration)
+    var(--motion-panel-easing) both;
 }
-@keyframes sheetEnter {
+.sheet[data-phase] {
+  will-change: transform, opacity;
+  transition: none;
+}
+.sheet[data-phase="closing"]::backdrop {
+  animation: sheetBackdropExit var(--motion-panel-duration)
+    var(--motion-panel-easing) both;
+}
+.sheet[data-phase="dragging"]::backdrop {
+  transition: none;
+}
+@keyframes sheetBackdropEnter {
   from {
     opacity: 0;
-    transform: translateY(18px) scale(0.985);
   }
   to {
     opacity: 1;
-    transform: none;
+  }
+}
+@keyframes sheetBackdropExit {
+  from {
+    opacity: var(--sheet-shade, 1);
+  }
+  to {
+    opacity: 0;
   }
 }
 .sheet-panel {
@@ -1471,12 +1508,45 @@ h1 .heading-dot {
   overflow: hidden;
 }
 .sheet-handle {
+  display: grid;
+  place-items: center;
+  width: 80px;
+  height: 28px;
+  margin: 0 auto;
+  flex-shrink: 0;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.sheet-handle::before {
+  content: "";
   width: 34px;
   height: 4px;
   border-radius: 4px;
   background: var(--line);
-  margin: 10px auto 0;
-  flex-shrink: 0;
+}
+.sheet[data-phase="dragging"] .sheet-handle {
+  cursor: grabbing;
+}
+:root[data-ready] body,
+:root[data-ready] .glass,
+:root[data-ready] .liquid {
+  transition:
+    background-color var(--motion-content-duration),
+    color var(--motion-content-duration),
+    border-color var(--motion-content-duration);
+}
+.top-nav a,
+.segmented button,
+.month-grid button,
+.sort-button,
+.action-dock button,
+.table-action {
+  transition:
+    background-color var(--motion-feedback-duration),
+    color var(--motion-feedback-duration),
+    box-shadow var(--motion-feedback-duration);
 }
 .sheet-heading {
   display: flex;
@@ -1492,6 +1562,9 @@ h1 .heading-dot {
   letter-spacing: -0.7px;
   margin: 0;
   line-height: 1.5;
+}
+.sheet-heading [tabindex="-1"]:focus {
+  outline: none;
 }
 .sheet-heading .eyebrow {
   font-size: 9px;
@@ -1820,7 +1893,7 @@ td:last-child {
   border: none;
   position: relative;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: background var(--motion-feedback-duration);
   flex-shrink: 0;
   margin: 0;
 }
@@ -1834,7 +1907,7 @@ td:last-child {
   border-radius: 50%;
   background: white;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
-  transition: transform 0.2s;
+  transition: transform var(--motion-feedback-duration);
 }
 .switch:checked {
   background: var(--accent);
@@ -2718,7 +2791,9 @@ td:last-child {
     font-size: 12px;
   }
   .sheet-handle {
-    margin-top: 7px;
+    height: 22px;
+  }
+  .sheet-handle::before {
     height: 3px;
   }
   .sheet-description {

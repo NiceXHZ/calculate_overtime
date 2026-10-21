@@ -61,7 +61,10 @@ function requireData() {
 }
 
 function showError(text, field) {
-  if (field) $(field).textContent = text;
+  if (field) {
+    $(field).textContent = text;
+    revealUi(field);
+  }
   if (!uiReady) {
     alert(text);
     return;
@@ -69,16 +72,24 @@ function showError(text, field) {
   notify(text, false, true);
 }
 
+function revealUi(id) {
+  if (uiReady && window.sheetMotion) window.sheetMotion.reveal($(id));
+}
+function setNoticeVisible(id, visible) {
+  if (uiReady && window.sheetMotion) window.sheetMotion.notice($(id), visible);
+  else $(id).hidden = !visible;
+}
+
 function notify(text, undo = false, error = false) {
   if (!uiReady) return;
   clearTimeout(toastTimer);
   $("toastText").textContent = text;
   $("undoButton").hidden = !undo;
-  $("toast").hidden = false;
+  setNoticeVisible("toast", true);
   $("toast").classList.toggle("is-error", error);
   toastTimer = setTimeout(
     () => {
-      $("toast").hidden = true;
+      setNoticeVisible("toast", false);
     },
     undo ? 12000 : error ? 9000 : 4500,
   );
@@ -86,10 +97,15 @@ function notify(text, undo = false, error = false) {
 
 function openDialog(id) {
   const dialog = $(id);
+  const opening = !dialog.open || window.sheetMotion?.isClosing(dialog);
+  if (window.sheetMotion) window.sheetMotion.prepareOpen(dialog);
   dialog.classList.add("active");
   dialog.setAttribute("aria-hidden", "false");
   if (typeof dialog.showModal === "function" && !dialog.open)
     dialog.showModal();
+  if (uiReady)
+    dialog.querySelector?.("[autofocus]")?.focus({ preventScroll: true });
+  if (opening && window.sheetMotion) window.sheetMotion.enter(dialog);
   if (uiReady) {
     document.documentElement.dataset.modal = "on";
     if (window.refreshLiquidGlass) window.refreshLiquidGlass();
@@ -99,18 +115,23 @@ function openDialog(id) {
 
 function closeDialog(id) {
   const dialog = $(id);
-  if (typeof dialog.close === "function" && dialog.open) dialog.close();
-  dialog.classList.remove("active");
-  dialog.setAttribute("aria-hidden", "true");
   if (id === "deleteOverlay") pendingDeleteDate = null;
   if (id === "confirmOverlay") confirmAction = null;
-  if (!uiReady || !document.querySelector("dialog[open]")) {
-    document.body.style.overflow = "";
-    if (uiReady) {
-      document.documentElement.dataset.modal = "off";
-      if (window.refreshLiquidGlass) window.refreshLiquidGlass();
+  const finish = () => {
+    if (typeof dialog.close === "function" && dialog.open) dialog.close();
+    dialog.classList.remove("active");
+    dialog.setAttribute("aria-hidden", "true");
+    if (!uiReady || !document.querySelector("dialog[open]")) {
+      document.body.style.overflow = "";
+      if (uiReady) {
+        document.documentElement.dataset.modal = "off";
+        if (window.refreshLiquidGlass) window.refreshLiquidGlass();
+      }
     }
-  }
+  };
+  if (dialog.open && window.sheetMotion)
+    window.sheetMotion.close(dialog, finish);
+  else finish();
 }
 
 function closeEditorOverlay() {
@@ -325,7 +346,7 @@ async function importAndShow(file) {
   if (await loadDataToMemory(file)) {
     selectedMonth = bestMonth();
     recordFilter = "all";
-    if (uiReady) $("recoveryBanner").hidden = true;
+    if (uiReady) setNoticeVisible("recoveryBanner", false);
     await processFile();
     scheduleDraft();
     notify("已载入记录，正在查看 " + readableMonth(selectedMonth));
@@ -571,6 +592,7 @@ function renderCalendar(summary, loading = false) {
       "</span></button>";
   }
   $("calendarGrid").innerHTML = html;
+  revealUi("calendarGrid");
 }
 
 function renderRecords() {
@@ -646,6 +668,7 @@ function renderRecords() {
       '</small></span><svg class="icon record-chevron" aria-hidden="true"><use href="#i-arrow-right"/></svg></button>';
   }
   $("result").innerHTML = html;
+  revealUi("result");
   $("recordsSummary").textContent =
     "共 " +
     summary.days.length +
@@ -704,10 +727,11 @@ function renderInsights(summary) {
         "</span></div>",
     )
     .join("");
-  $("incompleteNotice").hidden = !summary.incompleteDays;
+  setNoticeVisible("incompleteNotice", !!summary.incompleteDays);
   $("incompleteNotice").textContent =
     summary.incompleteDays +
     " 天休息日仅有一次打卡，补全首末记录后才能计算时长。";
+  revealUi("weeklyChart");
 }
 
 function editorMonthRange(now) {
@@ -783,6 +807,7 @@ function renderEditorTable() {
       '">查看</button></td>';
     tbody.appendChild(tr);
   }
+  revealUi("dataTable");
 }
 
 function mutationFinished(date, before, message) {
@@ -926,6 +951,7 @@ function renderDayDetail() {
         .join("")
     : '<div class="empty-state"><h3>这一天还没有记录</h3><p>如果漏记了，可以在下方补录。</p></div>';
   $("morePunchesButton").hidden = entries.length <= visiblePunches;
+  revealUi("deleteList");
   $("deleteDayButton").hidden = !entries.length;
   const future = date > localDateKey(new Date());
   $("dayAddButton").disabled = future;
@@ -1125,7 +1151,7 @@ function persistDraftNow() {
     const actual = localStorage.getItem(DRAFT_KEY);
     if (actual !== draftBase) {
       draftBlocked = true;
-      $("conflictBanner").hidden = false;
+      setNoticeVisible("conflictBanner", true);
       setSaveStatus("草稿有冲突，请先导出本页记录", true);
       return false;
     }
@@ -1173,7 +1199,7 @@ function readDraft() {
         minute: "2-digit",
       }) +
       " 暂存";
-    $("recoveryBanner").hidden = false;
+    setNoticeVisible("recoveryBanner", true);
   } catch {
     recoveredDraft = null;
   }
@@ -1195,7 +1221,7 @@ async function restoreDraft() {
     }
     dirty = raw.dirty === true;
     recoveredDraft = null;
-    $("recoveryBanner").hidden = true;
+    setNoticeVisible("recoveryBanner", false);
     await processFile();
     scheduleDraft();
     notify("已恢复上次的浏览器草稿");
@@ -1211,7 +1237,7 @@ function discardDraft() {
           localStorage.removeItem(DRAFT_KEY);
         draftBase = localStorage.getItem(DRAFT_KEY);
         recoveredDraft = null;
-        $("recoveryBanner").hidden = true;
+        setNoticeVisible("recoveryBanner", false);
       } catch {
         showError("浏览器不允许清除草稿");
       }
@@ -1348,6 +1374,8 @@ function renderMonthPicker() {
     : "<p>有打卡的月份，会在这里留下一个小圆点。</p>";
   $("previousYear").disabled = monthPickerYear <= 0;
   $("nextYear").disabled = monthPickerYear >= 9999;
+  revealUi("monthGrid");
+  revealUi("savedMonths");
 }
 
 function initializeApp() {
@@ -1495,7 +1523,7 @@ function initializeApp() {
   on("dayUndoButton", "click", undoLastMutation);
   on("editorUndoButton", "click", undoLastMutation);
   on("closeToast", "click", () => {
-    $("toast").hidden = true;
+    setNoticeVisible("toast", false);
   });
   on("restoreDraftButton", "click", restoreDraft);
   on("discardDraftButton", "click", discardDraft);
@@ -1524,6 +1552,10 @@ function initializeApp() {
       button.addEventListener("click", () => closeDialog(button.dataset.close)),
     );
   document.querySelectorAll("dialog").forEach((dialog) => {
+    dialog.addEventListener("cancel", (event) => {
+      event.preventDefault();
+      closeDialog(dialog.id);
+    });
     dialog.addEventListener("click", (event) => {
       if (event.target === dialog) {
         const rect = dialog.getBoundingClientRect();
@@ -1539,6 +1571,7 @@ function initializeApp() {
     dialog.addEventListener("close", () => {
       // A queued close event may belong to an earlier presentation of this same dialog.
       if (dialog.open) return;
+      if (window.sheetMotion) window.sheetMotion.reset(dialog);
       dialog.classList.remove("active");
       dialog.setAttribute("aria-hidden", "true");
       if (dialog.id === "confirmOverlay") confirmAction = null;
@@ -1550,6 +1583,7 @@ function initializeApp() {
       }
     });
   });
+  if (window.sheetMotion) window.sheetMotion.initialize(closeDialog);
   for (const event of ["dragenter", "dragover", "dragleave", "drop"])
     on("dropZone", event, (e) => {
       e.preventDefault();
@@ -1580,7 +1614,7 @@ function initializeApp() {
     if (event.key === DRAFT_KEY && event.newValue !== draftBase && dataLoaded) {
       draftBlocked = true;
       clearTimeout(draftTimer);
-      $("conflictBanner").hidden = false;
+      setNoticeVisible("conflictBanner", true);
       setSaveStatus("草稿有冲突，请先导出本页记录", true);
     }
   });
@@ -1597,6 +1631,7 @@ function initializeApp() {
     }),
   );
   if (window.initializeLiquidGlass) window.initializeLiquidGlass();
+  document.documentElement.dataset.ready = "true";
 }
 
 if (document.readyState === "loading" || !document.readyState)
